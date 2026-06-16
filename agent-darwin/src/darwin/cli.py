@@ -7,7 +7,6 @@ app = typer.Typer(help="Darwin CLI.", no_args_is_help=True)
 # Directories created by `darwin init`.
 INIT_DIRS = ["chunks", "memory", "templates", "reports"]
 
-
 @app.callback()
 def main() -> None:
     """Darwin CLI."""
