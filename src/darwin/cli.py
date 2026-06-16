@@ -10,9 +10,9 @@ INIT_FILES = {
     "MASTER_PLAN.md": (
         "# Master Plan\n\n"
         "Example plan:\n\n"
-        "1. Build the smallest CLI skeleton.\n"
-        "2. Set up the workspace files.\n"
-        "3. Split the plan into chunks (not done yet).\n"
+        "- Build the smallest CLI skeleton.\n"
+        "- Set up the workspace files.\n"
+        "- Split the plan into chunks.\n"
     ),
     "ROADMAP.md": (
         "# Roadmap\n\n"
@@ -47,27 +47,33 @@ def init() -> None:
 
 
 @app.command("split-plan")
-def split_plan(plan_file: Path = typer.Argument(..., help="Path to the master plan markdown file.")) -> None:
+def split_plan(
+    plan_file: Path = typer.Argument(..., help="Path to the master plan markdown file."),
+) -> None:
     """Extract tasks from a plan file and write ROADMAP.md."""
     if not plan_file.exists():
         typer.echo(f"error: file not found: {plan_file}", err=True)
         raise typer.Exit(1)
 
     lines = plan_file.read_text().splitlines()
-    tasks = [
-        line[2:].strip()
-        for line in lines
-        if line.startswith("- ") or line.startswith("* ")
-    ]
+    tasks = []
+    for line in lines:
+        if line.startswith("- ") or line.startswith("* "):
+            task = line[2:].strip()
+            if task:
+                tasks.append(task)
 
     if not tasks:
-        typer.echo("No bullet tasks found in the plan. ROADMAP.md was not changed.")
+        typer.echo("No bullet tasks found in the plan. Nothing was changed.")
         return
 
     typer.echo(f"Found {len(tasks)} task(s):\n")
+
     roadmap_lines = ["# Roadmap", "", "## Pending Tasks", ""]
+
     for i, task in enumerate(tasks, 1):
-        label = f"{i:03d} — {task}"
+        num = f"{i:03d}"
+        label = f"{num} — {task}"
         typer.echo(f"  {label}")
         roadmap_lines.append(f"- [ ] {label}")
 

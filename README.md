@@ -30,7 +30,7 @@ never overwrites existing files.
 **Starter files created (only if they do not already exist):**
 
 - `MASTER_PLAN.md` — short example plan
-- `ROADMAP.md` — placeholder (roadmap not generated yet)
+- `ROADMAP.md` — placeholder
 - `memory/mistakes.md`
 - `memory/winners.md`
 - `memory/decisions.md`
@@ -44,17 +44,16 @@ Reads the given markdown file, extracts all bullet tasks (lines starting with
 darwin split-plan MASTER_PLAN.md
 ```
 
-Example output:
+`ROADMAP.md` is always regenerated from the current plan. `MASTER_PLAN.md` is
+never modified.
 
+Example `ROADMAP.md` output:
+
+```markdown
+# Roadmap
+
+## Pending Tasks
+
+- [ ] 001 — Build the CLI skeleton
+- [ ] 002 — Set up workspace files
 ```
-Found 3 task(s):
-
-  001 — Build the smallest CLI skeleton
-  002 — Set up the workspace files
-  003 — Add the split-plan command
-
-written: ROADMAP.md (3 task(s))
-```
-
-`ROADMAP.md` is always overwritten by this command (it is regenerated from
-the plan). `MASTER_PLAN.md` is never modified.
