@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "darwin"
+version = "0.1.0"
+description = "Darwin CLI (Chunk 001 skeleton)"
+readme = "README.md"
+requires-python = ">=3.9"
+dependencies = [
+    "typer>=0.12",
+]
+
+[project.scripts]
+darwin = "darwin.cli:app"
+
+[tool.setuptools.packages.find]
+where = ["src"]

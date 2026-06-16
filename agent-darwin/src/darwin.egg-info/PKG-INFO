@@ -1,0 +1,27 @@
+Metadata-Version: 2.4
+Name: darwin
+Version: 0.1.0
+Summary: Darwin CLI (Chunk 001 skeleton)
+Requires-Python: >=3.9
+Description-Content-Type: text/markdown
+Requires-Dist: typer>=0.12
+
+# darwin
+
+Smallest CLI skeleton (Chunk 001).
+
+## Install
+
+```bash
+pip install -e .
+```
+
+## Run
+
+```bash
+darwin --help
+darwin init
+```
+
+`darwin init` creates `chunks/`, `memory/`, `templates/`, and `reports/` in the
+current directory. It is safe to run more than once.

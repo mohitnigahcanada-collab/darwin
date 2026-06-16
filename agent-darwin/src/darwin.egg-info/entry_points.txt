@@ -1,0 +1,2 @@
+[console_scripts]
+darwin = darwin.cli:app

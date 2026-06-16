@@ -1,0 +1,10 @@
+README.md
+pyproject.toml
+src/darwin/__init__.py
+src/darwin/cli.py
+src/darwin.egg-info/PKG-INFO
+src/darwin.egg-info/SOURCES.txt
+src/darwin.egg-info/dependency_links.txt
+src/darwin.egg-info/entry_points.txt
+src/darwin.egg-info/requires.txt
+src/darwin.egg-info/top_level.txt
