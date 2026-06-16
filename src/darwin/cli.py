@@ -115,11 +115,19 @@ def _parse_task_text(task_md: str) -> str:
     return "(task text not found)"
 
 
+def _write_if_missing(path: Path, content: str) -> str:
+    """Write content to path only if it does not exist. Returns 'created' or 'exists'."""
+    if path.exists():
+        return "exists"
+    path.write_text(content)
+    return "created"
+
+
 @app.command("prepare-chunk")
 def prepare_chunk(
     chunk_path: Path = typer.Argument(..., help="Path to the chunk folder, e.g. chunks/001-example-task"),
 ) -> None:
-    """Create STEP.md and CONTEXT.md for a chunk folder."""
+    """Create STEP.md, CONTEXT.md, CLAUDE_PROMPT.md, CODEX_REVIEW_PROMPT.md, ACCEPTANCE.md, and TESTS.md."""
     if not chunk_path.exists():
         typer.echo(f"error: chunk folder not found: {chunk_path}", err=True)
         raise typer.Exit(1)
@@ -132,11 +140,9 @@ def prepare_chunk(
     task_text = _parse_task_text(task_file.read_text())
     chunk_name = chunk_path.name
 
-    step_file = chunk_path / "STEP.md"
-    if step_file.exists():
-        typer.echo(f"exists:  {step_file}")
-    else:
-        step_file.write_text(
+    files: list[tuple[Path, str]] = [
+        (
+            chunk_path / "STEP.md",
             f"# STEP — {chunk_name}\n\n"
             f"## Goal\n\n"
             f"{task_text}\n\n"
@@ -149,15 +155,10 @@ def prepare_chunk(
             f"## Acceptance Criteria\n\n"
             f"- [ ] <!-- Add acceptance criteria here -->\n\n"
             f"## Notes\n\n"
-            f"<!-- Any extra notes, constraints, or decisions -->\n"
-        )
-        typer.echo(f"created: {step_file}")
-
-    context_file = chunk_path / "CONTEXT.md"
-    if context_file.exists():
-        typer.echo(f"exists:  {context_file}")
-    else:
-        context_file.write_text(
+            f"<!-- Any extra notes, constraints, or decisions -->\n",
+        ),
+        (
+            chunk_path / "CONTEXT.md",
             f"# CONTEXT — {chunk_name}\n\n"
             f"## Task Summary\n\n"
             f"{task_text}\n\n"
@@ -168,9 +169,107 @@ def prepare_chunk(
             f"## Constraints\n\n"
             f"- Do not overbuild.\n"
             f"- Only implement what this chunk requires.\n"
-            f"- Do not add features planned for later chunks.\n"
-        )
-        typer.echo(f"created: {context_file}")
+            f"- Do not add features planned for later chunks.\n",
+        ),
+        (
+            chunk_path / "CLAUDE_PROMPT.md",
+            f"# Claude Prompt — {chunk_name}\n\n"
+            f"## Task Goal\n\n"
+            f"{task_text}\n\n"
+            f"## Scope\n\n"
+            f"<!-- Fill in from STEP.md -->\n\n"
+            f"## Allowed Changes\n\n"
+            f"<!-- List the files and changes that are in scope -->\n\n"
+            f"## Forbidden\n\n"
+            f"- Do not implement features planned for later chunks.\n"
+            f"- Do not overbuild.\n"
+            f"- Do not modify files outside this chunk's scope.\n\n"
+            f"## Acceptance Criteria\n\n"
+            f"<!-- Copy from STEP.md -->\n\n"
+            f"## Test Instructions\n\n"
+            f"<!-- Describe exact commands to verify this chunk works -->\n\n"
+            f"## Output Required\n\n"
+            f"After completing the task, show:\n\n"
+            f"1. Files changed\n"
+            f"2. Exact test commands\n"
+            f"3. Test output\n"
+            f"4. What was intentionally not built\n",
+        ),
+        (
+            chunk_path / "CODEX_REVIEW_PROMPT.md",
+            f"# Codex Review Prompt — {chunk_name}\n\n"
+            f"You are a strict senior code reviewer.\n\n"
+            f"## Your Role\n\n"
+            f"Review the implementation of this chunk and determine PASS or FAIL.\n\n"
+            f"## Chunk Goal\n\n"
+            f"{task_text}\n\n"
+            f"## Scope Guard\n\n"
+            f"This chunk must only implement what is listed in STEP.md.\n"
+            f"Reject anything beyond the stated scope.\n\n"
+            f"## Expected Files\n\n"
+            f"<!-- List the files that should have been created or changed -->\n\n"
+            f"## Overbuild Check\n\n"
+            f"- [ ] No features added beyond chunk scope\n"
+            f"- [ ] No files created that were not required\n"
+            f"- [ ] No abstractions added prematurely\n\n"
+            f"## Test Checklist\n\n"
+            f"- [ ] Required files exist\n"
+            f"- [ ] Existing user files were not overwritten\n"
+            f"- [ ] Command runs without error\n"
+            f"- [ ] Running command twice does not crash\n\n"
+            f"## Output Format\n\n"
+            f"Respond with exactly one of:\n\n"
+            f"```\n"
+            f"PASS — <one line reason>\n"
+            f"```\n\n"
+            f"or\n\n"
+            f"```\n"
+            f"FAIL — <one line reason>\n"
+            f"       <specific item that failed>\n"
+            f"```\n",
+        ),
+        (
+            chunk_path / "ACCEPTANCE.md",
+            f"# Acceptance — {chunk_name}\n\n"
+            f"## Checklist\n\n"
+            f"- [ ] Chunk goal is satisfied: {task_text}\n"
+            f"- [ ] Required files were created or changed\n"
+            f"- [ ] Existing user files were not overwritten\n"
+            f"- [ ] All tests pass\n"
+            f"- [ ] README is accurate (if changed)\n"
+            f"- [ ] No future features were added\n",
+        ),
+        (
+            chunk_path / "TESTS.md",
+            f"# Tests — {chunk_name}\n\n"
+            f"## Install\n\n"
+            f"```bash\n"
+            f"python -m venv .venv && source .venv/bin/activate\n"
+            f"pip install -e .\n"
+            f"```\n\n"
+            f"## Run\n\n"
+            f"```bash\n"
+            f"# TODO: fill in the relevant CLI command for this chunk\n"
+            f"darwin <command> <args>\n"
+            f"```\n\n"
+            f"## Idempotency Test\n\n"
+            f"```bash\n"
+            f"# Run the command twice and confirm no crash and no data loss\n"
+            f"darwin <command> <args>\n"
+            f"darwin <command> <args>\n"
+            f"```\n\n"
+            f"## Error Cases\n\n"
+            f"```bash\n"
+            f"# Missing file or folder\n"
+            f"darwin <command> missing-path\n"
+            f"# Expected: clean error message, exit code 1, no traceback\n"
+            f"```\n",
+        ),
+    ]
+
+    for path, content in files:
+        status = _write_if_missing(path, content)
+        typer.echo(f"{status + ':':<9} {path}")
 
 
 if __name__ == "__main__":

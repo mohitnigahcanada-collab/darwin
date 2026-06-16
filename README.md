@@ -1,6 +1,6 @@
 # darwin
 
-Darwin CLI workspace skeleton (Chunk 005).
+Darwin CLI workspace skeleton (Chunk 006).
 
 ## Install
 
@@ -76,10 +76,18 @@ overwritten.
 darwin prepare-chunk chunks/001-create-project-skeleton
 ```
 
-**What it creates (only if missing):**
+**What it creates inside the chunk folder (only if missing):**
 
-- `chunks/001-.../STEP.md` — goal, scope, inputs, outputs, acceptance criteria, notes
-- `chunks/001-.../CONTEXT.md` — task summary, project state, files involved, constraints
+| File | Purpose |
+|---|---|
+| `STEP.md` | Goal, scope, inputs, outputs, acceptance criteria, notes |
+| `CONTEXT.md` | Task summary, project state, files involved, constraints |
+| `CLAUDE_PROMPT.md` | Ready-to-paste prompt for Claude to implement the chunk |
+| `CODEX_REVIEW_PROMPT.md` | Strict reviewer prompt — outputs PASS or FAIL |
+| `ACCEPTANCE.md` | Human checklist to sign off the chunk |
+| `TESTS.md` | Test commands: install, run, idempotency, error cases |
+
+All files are **never overwritten** — user edits survive re-runs.
 
 **Error cases handled cleanly:**
 
