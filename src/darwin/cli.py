@@ -1,3 +1,4 @@
+import re
 from pathlib import Path
 
 import typer
@@ -22,6 +23,13 @@ INIT_FILES = {
     "memory/winners.md": "# Winners\n",
     "memory/decisions.md": "# Decisions\n",
 }
+
+
+def _slug(text: str, max_len: int = 40) -> str:
+    text = text.lower()
+    text = re.sub(r"[^a-z0-9\s-]", "", text)
+    text = re.sub(r"\s+", "-", text.strip())
+    return text[:max_len].rstrip("-")
 
 
 @app.callback()
@@ -50,7 +58,7 @@ def init() -> None:
 def split_plan(
     plan_file: Path = typer.Argument(..., help="Path to the master plan markdown file."),
 ) -> None:
-    """Extract tasks from a plan file and write ROADMAP.md."""
+    """Extract tasks, create chunk folders with TASK.md, and write ROADMAP.md."""
     if not plan_file.exists():
         typer.echo(f"error: file not found: {plan_file}", err=True)
         raise typer.Exit(1)
@@ -73,12 +81,30 @@ def split_plan(
 
     for i, task in enumerate(tasks, 1):
         num = f"{i:03d}"
-        label = f"{num} — {task}"
-        typer.echo(f"  {label}")
-        roadmap_lines.append(f"- [ ] {label}")
+        folder_name = f"{num}-{_slug(task)}"
+        folder_path = Path("chunks") / folder_name
+        task_file = folder_path / "TASK.md"
+
+        folder_path.mkdir(parents=True, exist_ok=True)
+
+        if task_file.exists():
+            file_status = "exists"
+        else:
+            task_file.write_text(
+                f"# Chunk {num}\n\n"
+                f"**Task:** {task}\n"
+                f"**Status:** pending\n"
+            )
+            file_status = "created"
+
+        typer.echo(f"  {num} — {task}")
+        typer.echo(f"       {folder_path}/ [{file_status} TASK.md]")
+
+        roadmap_lines.append(f"- [ ] {num} — {task} — `{folder_path}/`")
 
     Path("ROADMAP.md").write_text("\n".join(roadmap_lines) + "\n")
-    typer.echo(f"\nwritten: ROADMAP.md ({len(tasks)} task(s))")
+    typer.echo(f"\nwritten: ROADMAP.md")
+    typer.echo(f"done:    chunks/ ({len(tasks)} folder(s))")
 
 
 if __name__ == "__main__":

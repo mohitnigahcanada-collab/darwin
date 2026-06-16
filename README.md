@@ -1,6 +1,6 @@
 # darwin
 
-Darwin CLI workspace skeleton (Chunk 003).
+Darwin CLI workspace skeleton (Chunk 004).
 
 ## Install
 
@@ -38,14 +38,22 @@ never overwrites existing files.
 ### `darwin split-plan MASTER_PLAN.md`
 
 Reads the given markdown file, extracts all bullet tasks (lines starting with
-`- ` or `* `), prints them numbered to the terminal, and writes `ROADMAP.md`.
+`- ` or `* `), creates a numbered chunk folder for each task under `chunks/`,
+writes `TASK.md` in each folder, and regenerates `ROADMAP.md`.
 
 ```bash
 darwin split-plan MASTER_PLAN.md
 ```
 
-`ROADMAP.md` is always regenerated from the current plan. `MASTER_PLAN.md` is
-never modified.
+**What it creates:**
+
+- `chunks/001-task-slug/TASK.md`
+- `chunks/002-task-slug/TASK.md`
+- …
+- `ROADMAP.md` (always regenerated from the current plan)
+
+**Idempotent:** running it twice does not crash. Existing `TASK.md` files are
+never overwritten. `MASTER_PLAN.md` is never modified.
 
 Example `ROADMAP.md` output:
 
@@ -54,6 +62,6 @@ Example `ROADMAP.md` output:
 
 ## Pending Tasks
 
-- [ ] 001 — Build the CLI skeleton
-- [ ] 002 — Set up workspace files
+- [ ] 001 — Create project skeleton — `chunks/001-create-project-skeleton/`
+- [ ] 002 — Add CLI init command — `chunks/002-add-cli-init-command/`
 ```
