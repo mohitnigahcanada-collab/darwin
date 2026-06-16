@@ -107,5 +107,71 @@ def split_plan(
     typer.echo(f"done:    chunks/ ({len(tasks)} folder(s))")
 
 
+def _parse_task_text(task_md: str) -> str:
+    """Extract the task text from TASK.md content."""
+    for line in task_md.splitlines():
+        if line.startswith("**Task:**"):
+            return line.removeprefix("**Task:**").strip()
+    return "(task text not found)"
+
+
+@app.command("prepare-chunk")
+def prepare_chunk(
+    chunk_path: Path = typer.Argument(..., help="Path to the chunk folder, e.g. chunks/001-example-task"),
+) -> None:
+    """Create STEP.md and CONTEXT.md for a chunk folder."""
+    if not chunk_path.exists():
+        typer.echo(f"error: chunk folder not found: {chunk_path}", err=True)
+        raise typer.Exit(1)
+
+    task_file = chunk_path / "TASK.md"
+    if not task_file.exists():
+        typer.echo(f"error: TASK.md not found in {chunk_path}", err=True)
+        raise typer.Exit(1)
+
+    task_text = _parse_task_text(task_file.read_text())
+    chunk_name = chunk_path.name
+
+    step_file = chunk_path / "STEP.md"
+    if step_file.exists():
+        typer.echo(f"exists:  {step_file}")
+    else:
+        step_file.write_text(
+            f"# STEP — {chunk_name}\n\n"
+            f"## Goal\n\n"
+            f"{task_text}\n\n"
+            f"## Scope\n\n"
+            f"<!-- What is in scope for this chunk? -->\n\n"
+            f"## Inputs\n\n"
+            f"<!-- What files or information does this chunk start with? -->\n\n"
+            f"## Outputs\n\n"
+            f"<!-- What files or results should this chunk produce? -->\n\n"
+            f"## Acceptance Criteria\n\n"
+            f"- [ ] <!-- Add acceptance criteria here -->\n\n"
+            f"## Notes\n\n"
+            f"<!-- Any extra notes, constraints, or decisions -->\n"
+        )
+        typer.echo(f"created: {step_file}")
+
+    context_file = chunk_path / "CONTEXT.md"
+    if context_file.exists():
+        typer.echo(f"exists:  {context_file}")
+    else:
+        context_file.write_text(
+            f"# CONTEXT — {chunk_name}\n\n"
+            f"## Task Summary\n\n"
+            f"{task_text}\n\n"
+            f"## Current Project State\n\n"
+            f"<!-- Describe what already exists in the project that is relevant -->\n\n"
+            f"## Files Likely Involved\n\n"
+            f"<!-- List files this chunk will read or modify -->\n\n"
+            f"## Constraints\n\n"
+            f"- Do not overbuild.\n"
+            f"- Only implement what this chunk requires.\n"
+            f"- Do not add features planned for later chunks.\n"
+        )
+        typer.echo(f"created: {context_file}")
+
+
 if __name__ == "__main__":
     app()

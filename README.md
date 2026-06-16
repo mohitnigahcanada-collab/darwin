@@ -1,6 +1,6 @@
 # darwin
 
-Darwin CLI workspace skeleton (Chunk 004).
+Darwin CLI workspace skeleton (Chunk 005).
 
 ## Install
 
@@ -65,3 +65,23 @@ Example `ROADMAP.md` output:
 - [ ] 001 — Create project skeleton — `chunks/001-create-project-skeleton/`
 - [ ] 002 — Add CLI init command — `chunks/002-add-cli-init-command/`
 ```
+
+### `darwin prepare-chunk <chunk_path>`
+
+Reads `TASK.md` from an existing chunk folder and creates `STEP.md` and
+`CONTEXT.md` inside it. Safe to run more than once — existing files are never
+overwritten.
+
+```bash
+darwin prepare-chunk chunks/001-create-project-skeleton
+```
+
+**What it creates (only if missing):**
+
+- `chunks/001-.../STEP.md` — goal, scope, inputs, outputs, acceptance criteria, notes
+- `chunks/001-.../CONTEXT.md` — task summary, project state, files involved, constraints
+
+**Error cases handled cleanly:**
+
+- Chunk folder does not exist
+- `TASK.md` is missing from the folder
