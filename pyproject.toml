@@ -4,16 +4,20 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "darwin"
-version = "0.1.0"
-description = "Darwin CLI (Chunk 001 skeleton)"
+version = "0.2.0"
+description = "Darwin Chunk OS CLI"
 readme = "README.md"
 requires-python = ">=3.9"
 dependencies = [
     "typer>=0.12",
 ]
 
+[project.optional-dependencies]
+mcp = ["mcp[cli]>=1.0"]
+
 [project.scripts]
 darwin = "darwin.cli:app"
+darwin-mcp = "darwin.mcp_server:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

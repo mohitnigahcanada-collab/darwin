@@ -1,6 +1,157 @@
 # darwin
 
-Darwin CLI workspace skeleton (Chunk 004).
+Darwin CLI — Chunk OS V1 + Multi-Brain Operator V0. Breaks a master plan into
+numbered chunks, prepares working files for each chunk, records results, and
+tracks memory across the full loop. Now includes brain routing and operator
+run packets for the full Mohit workflow.
+
+---
+
+## Darwin Architecture
+
+```
+Brain  = AI providers (Groq, OpenRouter, Poolside, NVIDIA) — plan and route
+Body   = Workers (Claude Code, OpenCode, Codex, Mohit) — build and review
+Hands  = MCP tools — coming later
+Nerves = A2A/ACP — coming later
+```
+
+**Mohit is always the Supreme Judge.** No brain or body worker can commit,
+push, deploy, or take destructive action without Mohit's explicit approval.
+
+### Brain vs Body
+
+| Layer  | Who                                      | Does what                       |
+|--------|------------------------------------------|---------------------------------|
+| Brain  | Groq, OpenRouter, Poolside, NVIDIA       | Plan, route, classify, prompt   |
+| Body   | Claude Code, OpenCode, Codex, Mohit      | Build, review, approve, commit  |
+| Hands  | MCP tools                                | Tool execution (later)          |
+| Nerves | A2A/ACP                                  | Agent communication (later)     |
+
+### API Keys
+
+API keys are **environment variables only**. Darwin never stores, prints, or
+logs key values. Use `darwin brain-status` to check which keys are configured.
+
+```bash
+export GROQ_API_KEY="..."
+export OPENROUTER_API_KEY="..."
+export POOLSIDE_API_KEY="..."
+export NVIDIA_API_KEY="..."
+```
+
+### Default Mode
+
+The default brain mode is **off**. All Darwin commands work fully offline
+without any API keys. Pass `--brain auto` to enable provider routing when
+keys are available, or `--brain <provider>` to select a specific provider.
+
+---
+
+## Multi-Brain Operator Run V0
+
+The operator run automates Mohit's manual workflow:
+
+**Before:** Mohit idea → ChatGPT plans → Claude builds → Codex reviews → Mohit commits
+
+**After:** One goal → Darwin creates a full operator run packet with brain routing,
+body worker selection, tool plan, build prompt, plan prompt, review prompt,
+test plan, acceptance checklist, and next action.
+
+### Quick Start
+
+```bash
+# 1. Initialize brain config (one-time setup)
+darwin brain-init
+
+# 2. Check which API keys are configured
+darwin brain-status
+
+# 3. Route a goal to see which worker to use (read-only, no files created)
+darwin brain-route --goal "add worker registry safely" --brain off
+
+# 4. Create a full operator run packet for an existing repo
+darwin operate-existing /path/to/repo --goal "add hello command safely" --brain off
+
+# 5. Use the generated prompts
+#    - Paste .darwin/runs/001-.../CLAUDE_BUILD_PROMPT.md into Claude Code
+#    - Paste .darwin/runs/001-.../CODEX_REVIEW_PROMPT.md into Codex after build
+#    - See NEXT_ACTION.md for the exact next step
+```
+
+### `darwin brain-init`
+
+Creates `.darwin/brain/` with config files. Never overwrites existing files.
+User edits survive reruns.
+
+Files created:
+- `.darwin/brain/BRAIN.md` — what brain is and isn't
+- `.darwin/brain/PROVIDERS.md` — supported providers and env vars
+- `.darwin/brain/SAFETY.md` — what is never sent to providers
+- `.darwin/brain/ROLES.md` — brain role and body worker definitions
+
+```bash
+darwin brain-init
+```
+
+### `darwin brain-status`
+
+Shows which API keys are configured (yes/no only — **never prints values**).
+Read-only. Does not create files or call APIs.
+
+```bash
+darwin brain-status
+```
+
+### `darwin brain-route --goal "..."`
+
+Routes a goal to the recommended brain role and body worker. Read-only — no
+files created, no workers called, no APIs called.
+
+```bash
+darwin brain-route --goal "add worker registry safely" --brain off
+darwin brain-route --goal "add worker registry safely" --brain auto
+darwin brain-route --goal "add worker registry safely" --brain groq
+```
+
+Options:
+- `--brain off` (default) — fully offline, deterministic
+- `--brain auto` — uses first available provider key; falls back to deterministic if no keys
+- `--brain groq|openrouter|poolside|nvidia` — specific provider; falls back if key missing
+
+### `darwin operate-existing <repo_path> --goal "..." --brain off`
+
+Creates a Darwin operator run packet inside the target repo at
+`.darwin/runs/NNN-<goal-slug>/`. All files are generated deterministically.
+**No workers, tools, or APIs are executed.**
+
+```bash
+darwin operate-existing /path/to/repo --goal "add hello command safely" --brain off
+darwin operate-existing /path/to/repo --goal "add hello command safely" --brain auto
+```
+
+Generated files inside the run folder:
+
+| File | Purpose |
+|---|---|
+| `RUN_SUMMARY.md` | Overview: goal, brain mode, worker, next action |
+| `BRAIN_ROUTE.md` | Route decision, provider availability, approval gates |
+| `BRAIN_PLAN.md` | Step-by-step plan for the run |
+| `PROJECT_BRIEF.md` | Detected project type and signals |
+| `REPO_MAP.md` | Top-level repo structure |
+| `BODY_WORKER_PLAN.md` | Worker roles and who acts when |
+| `TOOL_POLICY.md` | Tool rules (no execution in this chunk) |
+| `TASK_BREAKDOWN.md` | 3–7 concrete implementation steps |
+| `CLAUDE_BUILD_PROMPT.md` | Copy-paste ready Claude Code prompt |
+| `OPENCODE_PLAN_PROMPT.md` | Copy-paste ready OpenCode planning prompt |
+| `CODEX_REVIEW_PROMPT.md` | Copy-paste ready Codex review prompt |
+| `ACCEPTANCE_CHECKLIST.md` | Checklist before committing |
+| `TEST_PLAN.md` | Detected test commands |
+| `RISKS.md` | Detected risks |
+| `NEXT_ACTION.md` | One clear next step |
+| `TRACE.md` | What was and was not done |
+
+---
 
 ## Install
 
@@ -13,6 +164,45 @@ source .venv/bin/activate
 python -m pip install -e .
 ```
 
+## Full V1 Workflow
+
+```bash
+# 1. Set up workspace
+darwin init
+
+# 2. Write your plan (edit MASTER_PLAN.md with bullet tasks)
+#    - Build the CLI skeleton
+#    - Add the split-plan command
+#    - ...
+
+# 3. Split plan into chunks
+darwin split-plan MASTER_PLAN.md
+
+# 4. Find the next chunk to work on
+darwin next-chunk
+
+# 5. Prepare working files for that chunk
+darwin prepare-chunk chunks/001-build-the-cli-skeleton
+
+# 6. Do the work
+#    - Read CLAUDE_PROMPT.md and paste it into Claude Code
+#    - Read CODEX_REVIEW_PROMPT.md and paste it into your reviewer
+
+# 7. Record the outcome
+darwin record-result chunks/001-build-the-cli-skeleton --status pass --notes "all tests passed"
+
+# 8. Run a local file review
+darwin review-chunk chunks/001-build-the-cli-skeleton
+
+# 9. Update memory and mark the chunk done in ROADMAP
+darwin update-memory chunks/001-build-the-cli-skeleton
+
+# 10. Move to the next chunk
+darwin next-chunk
+```
+
+---
+
 ## Commands
 
 ### `darwin init`
@@ -20,48 +210,458 @@ python -m pip install -e .
 Sets up the workspace in the current directory. Safe to run more than once —
 never overwrites existing files.
 
-**Folders created:**
+**Folders created:** `chunks/` `memory/` `templates/` `reports/`
 
-- `chunks/`
-- `memory/`
-- `templates/`
-- `reports/`
+**Starter files created (only if missing):**
+`MASTER_PLAN.md`, `ROADMAP.md`, `memory/mistakes.md`, `memory/winners.md`,
+`memory/decisions.md`
 
-**Starter files created (only if they do not already exist):**
-
-- `MASTER_PLAN.md` — short example plan
-- `ROADMAP.md` — placeholder
-- `memory/mistakes.md`
-- `memory/winners.md`
-- `memory/decisions.md`
+---
 
 ### `darwin split-plan MASTER_PLAN.md`
 
-Reads the given markdown file, extracts all bullet tasks (lines starting with
-`- ` or `* `), creates a numbered chunk folder for each task under `chunks/`,
-writes `TASK.md` in each folder, and regenerates `ROADMAP.md`.
+Reads bullet tasks (`- ` or `* `) from the plan, creates `chunks/NNN-slug/`
+folders with `TASK.md`, and regenerates `ROADMAP.md`. Existing `TASK.md` files
+are never overwritten.
 
 ```bash
 darwin split-plan MASTER_PLAN.md
 ```
 
-**What it creates:**
+---
 
-- `chunks/001-task-slug/TASK.md`
-- `chunks/002-task-slug/TASK.md`
-- …
-- `ROADMAP.md` (always regenerated from the current plan)
+### `darwin next-chunk`
 
-**Idempotent:** running it twice does not crash. Existing `TASK.md` files are
-never overwritten. `MASTER_PLAN.md` is never modified.
+Reads `ROADMAP.md` and prints the first unchecked `- [ ]` chunk.
 
-Example `ROADMAP.md` output:
-
-```markdown
-# Roadmap
-
-## Pending Tasks
-
-- [ ] 001 — Create project skeleton — `chunks/001-create-project-skeleton/`
-- [ ] 002 — Add CLI init command — `chunks/002-add-cli-init-command/`
+```bash
+darwin next-chunk
+# next chunk:  001 — Build the CLI skeleton
+# path:        chunks/001-build-the-cli-skeleton
+# run:         darwin prepare-chunk chunks/001-build-the-cli-skeleton
 ```
+
+---
+
+### `darwin prepare-chunk <chunk_path>`
+
+Creates all working files inside a chunk folder (only if missing):
+
+| File | Purpose |
+|---|---|
+| `STEP.md` | Goal, scope, inputs, outputs, acceptance criteria |
+| `CONTEXT.md` | Task summary, project state, files involved, constraints |
+| `CLAUDE_PROMPT.md` | Ready-to-paste prompt for Claude |
+| `CODEX_REVIEW_PROMPT.md` | Strict reviewer prompt — outputs PASS or FAIL |
+| `ACCEPTANCE.md` | Human sign-off checklist |
+| `TESTS.md` | Test commands: install, run, idempotency, error cases |
+
+---
+
+### `darwin record-result <chunk_path> --status <status> --notes <notes>`
+
+Appends a timestamped result entry to `RESULT.md`. Never overwrites.
+
+```bash
+darwin record-result chunks/001-build-the-cli-skeleton --status pass --notes "tests green"
+darwin record-result chunks/001-build-the-cli-skeleton --status fail --notes "missing output"
+darwin record-result chunks/001-build-the-cli-skeleton --status blocked --notes "waiting on upstream"
+```
+
+---
+
+### `darwin review-chunk <chunk_path>`
+
+Checks required files, optional files, and forbidden files; writes a
+timestamped verdict to `REVIEW.md`. Appends on repeated runs.
+
+**Required:** `TASK.md` `STEP.md` `CONTEXT.md` `CLAUDE_PROMPT.md`
+`CODEX_REVIEW_PROMPT.md` `ACCEPTANCE.md` `TESTS.md`
+
+**Forbidden:** `MEMORY_UPDATE.md` `metadata.yaml`
+
+Verdict is `PASS` only when all required files are present and no forbidden
+files exist.
+
+---
+
+### `darwin update-memory <chunk_path>`
+
+Reads the latest status from `RESULT.md` and verdict from `REVIEW.md`, then:
+
+| Outcome | Actions |
+|---|---|
+| result=pass AND review=PASS | appends to `memory/winners.md` + `memory/decisions.md`; marks ROADMAP `[x]` |
+| result=fail/blocked OR review=FAIL | appends to `memory/mistakes.md` + `memory/decisions.md`; ROADMAP unchanged |
+
+```bash
+darwin update-memory chunks/001-build-the-cli-skeleton
+```
+
+---
+
+## Status / Doctor / Version
+
+Quick commands to verify Darwin is healthy before starting work.
+
+```bash
+darwin version
+darwin status
+darwin doctor
+```
+
+### `darwin version`
+
+Prints the installed Darwin version from package metadata.
+
+```
+darwin version 0.2.0
+```
+
+### `darwin status`
+
+Read-only. Shows the current workspace layout and the installed Darwin feature level. Useful when switching between projects.
+
+```bash
+darwin status
+# Darwin Status
+# =============
+# CWD: /path/to/project
+# git: yes (.git found)
+#
+# Project files:
+#   [x] pyproject.toml
+#   [x] README.md
+#
+# Workspace directories:
+#   [x] chunks/
+#   [x] memory/
+#   [ ] evals/
+#   [ ] .darwin/
+#   [x] scripts/
+#
+# Smoke tests:
+#   [x] scripts/smoke_test_chunk_os.sh
+#   [x] scripts/smoke_test_mcp_tools.py
+#   [x] scripts/smoke_test_eval_harness.sh
+#   [x] scripts/smoke_test_repo_intake.sh
+#   [x] scripts/smoke_test_status_doctor.sh
+#
+# Darwin level: 4 — Existing Repo Intake V0
+```
+
+### `darwin doctor`
+
+Read-only. Checks Python version, package imports, entry point registration, optional MCP SDK, smoke test file presence, and absence of forbidden files. Does **not** run smoke tests. Prints `PASS`, `WARN`, or `FAIL` per check.
+
+```bash
+darwin doctor
+# Darwin Doctor
+# =============
+# [PASS] Python 3.11.x >= 3.9
+# [PASS] darwin package importable
+# [PASS] typer importable
+# [PASS] darwin CLI entry point
+# [WARN] MCP SDK (optional) — not installed — run: pip install darwin[mcp]
+# [WARN] scripts/smoke_test_chunk_os.sh — not found in current directory
+# ...
+# Summary: 9 PASS, 5 WARN, 0 FAIL
+```
+
+`WARN` means non-critical (e.g. MCP not installed, running from a directory that isn't the repo root). `FAIL` means something is broken.
+
+---
+
+## Tool Registry V0
+
+A local deterministic catalog of tools, MCPs, and workers that Darwin may suggest for a task. Does not install, configure, or run any tool.
+
+```bash
+darwin tool-init                             # create .darwin/tools/ (idempotent)
+darwin tool-list                             # list all cards with type/risk/approval
+darwin tool-suggest --goal "build React UI"  # keyword-based suggestions
+```
+
+### What it does
+
+- `tool-init` creates one Markdown card per tool under `.darwin/tools/`. Cards describe type, risk level, when to wake a tool, and whether approval is required. Never overwrites existing cards — user edits survive reruns.
+- `tool-list` reads all cards and prints a table of name / type / risk / approval.
+- `tool-suggest` matches your goal against a built-in keyword map and returns up to 5 suggestions with risk and approval notes. Fully deterministic — no LLM, no network.
+
+### What it does NOT do
+
+- Does not install any MCP server.
+- Does not configure OpenCode or any agent.
+- Does not run any tool.
+- Does not call any network or LLM API.
+
+### Registered tools
+
+| Card | Type | Risk |
+|---|---|---|
+| `darwin_chunk_mcp.md` | MCP / Internal | low |
+| `context7_docs_mcp.md` | MCP | medium |
+| `proxima_research_mcp.md` | MCP | high |
+| `github_mcp.md` | MCP | medium |
+| `playwright_mcp.md` | MCP | medium |
+| `chrome_devtools_mcp.md` | MCP | medium |
+| `semgrep_mcp.md` | MCP | medium |
+| `osv_mcp.md` | MCP | medium |
+| `supabase_mcp.md` | MCP | high |
+| `postgres_mcp.md` | MCP | high |
+| `docker_mcp.md` | MCP | high |
+| `opencode_worker.md` | Worker | high |
+| `claude_code_worker.md` | Worker | medium |
+| `codex_reviewer.md` | Reviewer | low |
+
+`darwin doctor` warns if `.darwin/` exists without a `.darwin/tools/` directory.
+
+---
+
+## Spec Surface V0
+
+A read-only contract document describing exactly what Darwin supports, which scenarios are protected, and which commands have smoke test coverage. Run once per repo.
+
+```bash
+darwin spec-init    # create .darwin/spec/ (idempotent, never overwrites)
+darwin spec-status  # show spec file presence and protected command count
+```
+
+### Files created under `.darwin/spec/`
+
+| File | Contents |
+|---|---|
+| `SPEC_SURFACE.md` | Project name, Darwin level, supported command groups, unsupported features |
+| `SCENARIOS.md` | Each protected user scenario with its smoke test reference |
+| `PROTECTED_COMMANDS.md` | Every Darwin command mapped to its covering smoke test |
+
+User edits to these files survive a rerun of `spec-init`.
+
+`darwin doctor` warns (but does not fail) if `.darwin/` exists without a `.darwin/spec/` directory.
+
+---
+
+## Existing Repo Intake V0
+
+Inspect an existing project and let Darwin build a `.darwin/` understanding pack
+before any coding starts. No LLM calls — deterministic file scanning only.
+
+```bash
+darwin inspect-repo . --goal "improve CLI tests"
+darwin inspect-repo /path/to/project --goal "add authentication"
+```
+
+### Output files
+
+| File | Contents |
+|---|---|
+| `.darwin/PROJECT_BRIEF.md` | Repo path, user goal, detected project type, summary, timestamp |
+| `.darwin/REPO_MAP.md` | Top-level file tree (noisy dirs excluded) and important files |
+| `.darwin/COMMANDS.md` | Detected install / test / run commands with caveats |
+| `.darwin/RISK_LIST.md` | Missing README, missing tests, no lockfile, etc. |
+| `.darwin/UNKNOWN_QUESTIONS.md` | What Darwin could not determine; questions to answer before coding |
+| `.darwin/MASTER_PLAN_DRAFT.md` | Chunkable bullet plan based on goal and repo scan |
+
+All files are written only if they do not already exist — user edits survive a
+rerun. Safe to run more than once.
+
+### Detected signals
+
+- Python: `pyproject.toml`, `requirements.txt`, `setup.py`
+- Node / Vite: `package.json`, `vite.config.*`
+- Git, README, `scripts/`, `tests/` directories
+- `package.json` scripts block (install, test, dev/start)
+- Python project name and `[project.scripts]` console entry points from `pyproject.toml`
+
+---
+
+## Darwin Eval Harness V0
+
+No Darwin module becomes permanent unless it beats baseline.
+
+The eval harness gives you a structured way to score any Darwin module against
+a defined task before you trust it in production. V0 is intentionally simple:
+manual scoring, no LLM judging, no network calls.
+
+### Setup
+
+```bash
+darwin eval-init
+```
+
+Creates `evals/` with task definitions, run history, reports, and baselines
+directories. Safe to rerun — existing task files are never overwritten.
+
+### Commands
+
+```bash
+# Initialise eval structure (idempotent)
+darwin eval-init
+
+# List available eval tasks
+darwin eval-list
+
+# Run an eval and generate a scorecard template
+darwin eval-run repo_intake_basic --candidate darwin-v0
+
+# Print the latest eval report
+darwin eval-report
+```
+
+### Scorecard fields
+
+Each run produces a scorecard with these fields to fill in manually:
+
+| Metric | Description |
+|---|---|
+| Functional correctness `/10` | Did it do what was asked? |
+| Useful output `/10` | Was the output actually useful? |
+| False assumption penalty `/10` | 10 = no false assumptions |
+| Overbuild penalty `/10` | 10 = no overbuild |
+| Human confidence `/10` | How confident are you in this result? |
+| Safety | PASS or FAIL |
+| Verdict | KEEP / FIX / KILL |
+
+### Eval file layout
+
+```
+evals/
+  tasks/          ← task definitions (edit freely)
+  runs/           ← timestamped run reports
+  reports/        ← latest.md always points to most recent run
+  baselines/      ← optional baseline files per task
+  README.md
+```
+
+---
+
+## Fast Track Build Protocol
+
+Fast Track is for bundling several low-risk infrastructure improvements only
+when they are local, deterministic, smoke-testable, and easy to split apart.
+It is not permission to add future product modules or execute agents.
+
+Use Fast Track for registry files, docs, status/doctor coverage, and smoke
+tests. Stop immediately if a smoke test fails, user edits are overwritten, app
+code starts executing tools or network calls, or Darwin level changes beyond
+Level 4.
+
+---
+
+## Feature Registry V0
+
+A local deterministic registry of Darwin feature and command coverage.
+
+```bash
+darwin feature-init
+darwin feature-list
+darwin feature-status
+```
+
+`feature-init` creates `.darwin/features/FEATURES.md`,
+`.darwin/features/COMMANDS.md`, and `.darwin/features/COVERAGE.md` only when
+missing. Existing files are never overwritten, so user edits survive reruns.
+`feature-list` and `feature-status` are read-only.
+
+---
+
+## Worker Registry V0
+
+A conservative local catalog of workers Darwin may suggest. It does not
+install, configure, or run Claude, Codex, OpenCode, MCPs, or any agent.
+
+```bash
+darwin worker-init
+darwin worker-list
+darwin worker-suggest --goal "review tests and verify scope"
+```
+
+`worker-init` creates `.darwin/workers/` with worker cards only when missing.
+`worker-list` and `worker-suggest` are read-only and deterministic.
+
+---
+
+## Batch Planner / Speed Lane V0
+
+Plans a batch size for local work. It is planning-only: it does not execute
+agents, tools, MCPs, shell commands, network calls, or LLM calls.
+
+```bash
+darwin batch-plan --goal "safe local registry docs" --max-items 7
+```
+
+Suggested modes:
+
+| Mode | Use when |
+|---|---|
+| `single` | Dangerous, external, production, database, secrets, OpenCode/MCP execution, or agent-protocol execution risk |
+| `small-batch-3` | Mixed refactor, architecture, docs, and tests |
+| `speed-batch-5` | Local deterministic infrastructure, read-only registries, docs, and smoke tests |
+| `max-batch-7` | Explicitly low-risk, local, deterministic, smoke-testable work |
+
+---
+
+## Smoke Tests
+
+```bash
+source .venv/bin/activate
+bash scripts/smoke_test_chunk_os.sh        # full CLI loop
+bash scripts/smoke_test_repo_intake.sh     # repo intake
+bash scripts/smoke_test_eval_harness.sh    # eval harness
+bash scripts/smoke_test_status_doctor.sh   # version / status / doctor
+bash scripts/smoke_test_spec_surface.sh    # spec-init / spec-status
+bash scripts/smoke_test_tool_registry.sh   # tool-init / tool-list / tool-suggest
+bash scripts/smoke_test_fast_track_bundle.sh # feature / worker / batch planner
+python scripts/smoke_test_mcp_tools.py     # MCP tool functions
+```
+
+---
+
+## Using Chunk OS through MCP
+
+Darwin exposes all Chunk OS operations as MCP tools so Claude Code and other
+MCP-capable agents can drive the full loop without a shell.
+
+### Install
+
+```bash
+pip install "darwin[mcp]"
+```
+
+### Start the server
+
+```bash
+darwin-mcp
+# or
+python -m darwin.mcp_server
+```
+
+### Add to Claude Code
+
+```json
+{
+  "mcpServers": {
+    "darwin": {
+      "command": "darwin-mcp"
+    }
+  }
+}
+```
+
+### Available MCP tools
+
+| Tool | Description |
+|---|---|
+| `list_chunks(project_path)` | List all chunk folders |
+| `next_chunk(project_path)` | First unchecked chunk from ROADMAP.md |
+| `prepare_chunk(project_path, chunk_path)` | Create STEP.md, CLAUDE_PROMPT.md, etc. |
+| `read_chunk_files(project_path, chunk_path)` | Return all file contents in a chunk |
+| `get_builder_prompt(project_path, chunk_path)` | Return CLAUDE_PROMPT.md content |
+| `get_review_prompt(project_path, chunk_path)` | Return CODEX_REVIEW_PROMPT.md content |
+| `record_result(project_path, chunk_path, status, notes)` | Record pass/fail/blocked |
+| `review_chunk(project_path, chunk_path)` | Run local file checks, write REVIEW.md |
+| `update_memory(project_path, chunk_path)` | Update memory files, mark ROADMAP done |
+
+All tools are read/write local file operations only — no network calls, no LLM
+API calls, no shell execution. Chunk paths must stay inside the supplied
+project path; `..` path escapes are rejected.

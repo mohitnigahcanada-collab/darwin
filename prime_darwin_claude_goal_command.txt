@@ -1,0 +1,235 @@
+/goal Build Prime Darwin Production V0 in agent-darwin.
+
+You are Claude Code acting as a strict senior implementation worker, tester, and scope guard.
+
+Project:
+agent-darwin
+
+Mission:
+Build Prime Darwin V0: a copied-repo evolutionary software factory that takes Mohit's raw brainstorm/master plan, creates plan/prompt/context variants, runs multiple isolated candidate repo copies through OpenCode SDK worker/evaluator lanes, applies GitSafe snapshots/tests/rollback, produces evidence-backed rankings, generates Poolside second-review prompts after every milestone, creates Codex/Opus audit artifacts, and never touches original repos or auto-promotes anything.
+
+Current direction locked:
+- OpenCode SDK is primary programmable model/tool hub.
+- Poolside pool CLI is second-review lane after every milestone.
+- Darwin owns GitSafe snapshots, candidate copies, scoring, memory, reports, and promotion recommendations.
+- Codex remains strict code/test reviewer.
+- Opus remains final audit/promotion advisor through audit prompt artifacts.
+- Aider is optional later; do not fork Aider or depend on Aider internals in this chunk.
+- LangGraph is later; do not add LangGraph until simple Python proof works.
+
+Primary user workflow:
+Mohit points Darwin at an already copied repo and a master plan.
+Darwin preserves raw plan.
+Darwin creates 3 plan versions, 2 prompt versions, and 2 context versions.
+Darwin scores variants using OpenCode SDK structured JSON plus Darwin rules.
+Darwin creates 4 candidate repo copies.
+Darwin runs OpenCode SDK build/eval inside candidate copies.
+Darwin uses GitSafe wrapper for snapshot, tests, commit/rollback.
+Darwin creates Poolside pool review prompts after every milestone.
+Darwin captures Codex review artifacts and Opus audit prompts.
+Darwin ranks candidates and writes MORNING_REPORT.md.
+Mohit manually promotes the winning copy.
+
+Hard rules:
+1. Work in small milestones/chunks only.
+2. After each milestone, run tests and write SELF_AUDIT.md.
+3. After each milestone, generate a POOLSIDE_REVIEW_PROMPT.md for second review.
+4. Do not proceed past a failing milestone unless the fix is local, minimal, and retested.
+5. Never touch original repo paths except reading explicitly provided current repo source if needed.
+6. Never git push.
+7. Never auto-merge.
+8. Never store or print API keys.
+9. Never read/write/copy .env or secrets.
+10. No infinite loop in V0. Use max_generations and stop rules.
+11. Smoke tests must use fake OpenCode/Poolside/Codex workers and must not call real APIs.
+12. OpenCode SDK bridge must support fake mode first, then real mode behind env/config.
+13. Poolside review must be generated as an artifact prompt; do not require Poolside to be installed for smoke tests.
+14. Keep existing Darwin commands and smoke tests working.
+
+Production architecture:
+- Darwin Python core modules:
+  - evolution_ops.py
+  - opencode_bridge_ops.py
+  - gitsafe_ops.py
+  - scoring_ops.py
+  - candidate_ops.py
+  - review_ops.py
+  - report_ops.py
+  - poolside_review_ops.py
+- Optional Node/TS bridge for OpenCode SDK:
+  - tools/opencode_bridge/package.json
+  - tools/opencode_bridge/src/evaluate.ts
+  - tools/opencode_bridge/src/build.ts
+  - tools/opencode_bridge/src/schema.ts
+  - tools/opencode_bridge/src/index.ts
+- CLI commands:
+  - darwin evolution-init
+  - darwin evolution-plan
+  - darwin evolution-run
+  - darwin evolution-status
+  - darwin evolution-report
+  - darwin evolution-promote-suggestion
+  - darwin poolside-review-prompt
+  - darwin self-audit
+
+Milestone plan:
+
+M0 - Preflight and scope freeze
+- Inspect current repo state.
+- Confirm existing smoke tests pass before changes.
+- Create implementation plan only.
+- No code changes beyond a temporary scratch note if needed.
+Tests:
+  git status --short
+  darwin --help
+  darwin status
+  darwin doctor
+  existing smoke tests listed in README
+Self-audit:
+  Write .darwin/reviews/M0_SELF_AUDIT.md
+Poolside:
+  Write .darwin/reviews/M0_POOL_REVIEW_PROMPT.md
+
+M1 - Contracts, schemas, and file layout
+- Add schemas/dataclasses for EvolutionRun, Candidate, Variant, Scorecard, ReviewResult, StopRules.
+- Add deterministic path builders for .darwin/evolution/<run-id>/.
+- Add no external worker execution.
+Tests:
+  python -m compileall src scripts
+  add unit/smoke tests for path/schema creation
+  existing smoke tests
+Self-audit + Poolside prompt required.
+
+M2 - evolution-init and evolution-plan
+- Preserve RAW_MOHIT_PLAN.md.
+- Create 3 plan variants, 2 prompt variants, 2 context variants deterministically in fake/off mode.
+- Create VARIANT_MATRIX.md and PLAN_SCORES.md.
+- No workers run.
+Tests:
+  smoke_test_evolution_plan.sh
+  verify raw plan preserved exactly
+  verify variant count and scoring files
+  verify no candidate repo copies yet
+  existing smoke tests
+Self-audit + Poolside prompt required.
+
+M3 - OpenCode SDK bridge fake-first
+- Add OpenCode bridge interface with fake mode and real mode config placeholders.
+- Fake mode returns strict JSON for plan/prompt/context/build eval.
+- Real mode must be behind env vars and not called in smoke tests.
+- If Node bridge is added, include npm install/build checks only when dependencies are local or skipped cleanly.
+Tests:
+  smoke_test_opencode_bridge_fake.sh
+  verify JSON schema validation
+  verify no network/API call in smoke
+  existing smoke tests
+Self-audit + Poolside prompt required.
+
+M4 - GitSafe wrapper and candidate copies
+- Create candidate repo copies from --repo-copy excluding .git, .env, .venv, node_modules, build/dist/cache, .darwin/evolution/runs.
+- Initialize git baseline inside each candidate copy.
+- Add snapshot, status, diff, log, commit-if-pass, rollback/stop helpers.
+Tests:
+  smoke_test_gitsafe_candidates.sh
+  verify original copied repo root unchanged except .darwin/evolution
+  verify .env not copied
+  verify no git push
+  verify rollback works
+  existing smoke tests
+Self-audit + Poolside prompt required.
+
+M5 - evolution-run generation 1
+- Run up to 4 candidates with fake OpenCode builder.
+- For each: generate prompt/context, run fake build, run tests, capture git evidence, produce scorecard.
+- Bad candidate stops; good candidate gets reviewed.
+Tests:
+  smoke_test_evolution_run_fake.sh
+  verify 4 candidates created
+  verify A/B candidate outcomes simulated
+  verify SCORECARD.md and OUTCOME_SCORE.json
+  verify RANKING.md exists
+  existing smoke tests
+Self-audit + Poolside prompt required.
+
+M6 - Poolside second-review integration artifacts
+- Add darwin poolside-review-prompt command.
+- Generate review prompts for every milestone and every candidate.
+- Include manual pool instructions and optional pool exec command.
+- Include safe settings.yaml template with deny rules.
+- Do not call real pool in smoke tests.
+Tests:
+  smoke_test_poolside_review_prompts.sh
+  verify prompt includes no secrets
+  verify prompt asks Poolside for PASS/FAIL with evidence
+  verify optional pool exec examples are generated but not executed
+  existing smoke tests
+Self-audit + Poolside prompt required.
+
+M7 - Codex review and Opus audit artifacts
+- Generate CODEX_REVIEW_PROMPT.md from diff/tests/smoke/git status.
+- Generate CLAUDE_OPUS_AUDIT_PROMPT.md only for best candidates.
+- Add strict PASS/FAIL formats.
+- Do not call real Codex/Opus in smoke tests unless explicitly configured.
+Tests:
+  smoke_test_review_audit_artifacts.sh
+  verify prompts include evidence and scope rules
+  verify failed candidates do not get promotion-ready output
+  existing smoke tests
+Self-audit + Poolside prompt required.
+
+M8 - Evolution continuation and morning report
+- If generation finishes early, select best + second-best and create up to 2 child candidates if max_generations allows.
+- Implement no-improvement stop rule.
+- Generate MORNING_REPORT.md, BEST_VERSION.md, SECOND_BEST.md, FAILED_OR_STOPPED.md, PROMOTE_RECOMMENDATION.md, LEARNINGS.md.
+Tests:
+  smoke_test_evolution_morning_report.sh
+  verify best/second-best/failed outputs
+  verify continuation uses child candidates
+  verify no infinite loop
+  existing smoke tests
+Self-audit + Poolside prompt required.
+
+M9 - Status, doctor, README, final hardening
+- Update darwin status/doctor.
+- Update README with examples and safety model.
+- Run all tests.
+- Add final SELF_AUDIT.md and POOLSIDE_REVIEW_PROMPT.md.
+Tests:
+  bash scripts/smoke_test_evolution_loop.sh
+  bash scripts/smoke_test_opencode_bridge_fake.sh
+  bash scripts/smoke_test_gitsafe_candidates.sh
+  bash scripts/smoke_test_poolside_review_prompts.sh
+  existing smoke tests from repo
+  python -m compileall src scripts
+  grep forbidden strings: git push, .env copy, unsafe real API calls in smoke
+  git status --short
+Final report required.
+
+Milestone self-audit format:
+# Milestone <N> Self Audit
+Verdict: PASS / FAIL
+Files changed:
+Commands run:
+Test output summary:
+Git evidence:
+Scope check:
+Safety check:
+Bugs found:
+Fixes made:
+What remains intentionally unbuilt:
+Next milestone readiness:
+
+Poolside second-review prompt format:
+# Poolside Second Review - Milestone <N>
+You are a strict independent reviewer. Review only the current milestone. Do not implement changes unless explicitly asked. Check scope, tests, safety, file changes, git status, hidden risky behavior, and whether the milestone can proceed. Return PASS or FAIL with evidence and exact fixes.
+
+Final answer expected from Claude after each milestone:
+- Milestone completed: yes/no
+- Tests passed: yes/no
+- Self-audit path:
+- Poolside review prompt path:
+- Ready for Poolside second review: yes/no
+- Ready for next milestone: yes/no
+
+Do not commit or push until Mohit explicitly says commit.
+Stop after M0 report first if current repo tests are failing.
