@@ -1,8 +1,157 @@
 # darwin
 
-Darwin CLI — Chunk OS V1. Breaks a master plan into numbered chunks, prepares
-working files for each chunk, records results, and tracks memory across the
-full loop.
+Darwin CLI — Chunk OS V1 + Multi-Brain Operator V0. Breaks a master plan into
+numbered chunks, prepares working files for each chunk, records results, and
+tracks memory across the full loop. Now includes brain routing and operator
+run packets for the full Mohit workflow.
+
+---
+
+## Darwin Architecture
+
+```
+Brain  = AI providers (Groq, OpenRouter, Poolside, NVIDIA) — plan and route
+Body   = Workers (Claude Code, OpenCode, Codex, Mohit) — build and review
+Hands  = MCP tools — coming later
+Nerves = A2A/ACP — coming later
+```
+
+**Mohit is always the Supreme Judge.** No brain or body worker can commit,
+push, deploy, or take destructive action without Mohit's explicit approval.
+
+### Brain vs Body
+
+| Layer  | Who                                      | Does what                       |
+|--------|------------------------------------------|---------------------------------|
+| Brain  | Groq, OpenRouter, Poolside, NVIDIA       | Plan, route, classify, prompt   |
+| Body   | Claude Code, OpenCode, Codex, Mohit      | Build, review, approve, commit  |
+| Hands  | MCP tools                                | Tool execution (later)          |
+| Nerves | A2A/ACP                                  | Agent communication (later)     |
+
+### API Keys
+
+API keys are **environment variables only**. Darwin never stores, prints, or
+logs key values. Use `darwin brain-status` to check which keys are configured.
+
+```bash
+export GROQ_API_KEY="..."
+export OPENROUTER_API_KEY="..."
+export POOLSIDE_API_KEY="..."
+export NVIDIA_API_KEY="..."
+```
+
+### Default Mode
+
+The default brain mode is **off**. All Darwin commands work fully offline
+without any API keys. Pass `--brain auto` to enable provider routing when
+keys are available, or `--brain <provider>` to select a specific provider.
+
+---
+
+## Multi-Brain Operator Run V0
+
+The operator run automates Mohit's manual workflow:
+
+**Before:** Mohit idea → ChatGPT plans → Claude builds → Codex reviews → Mohit commits
+
+**After:** One goal → Darwin creates a full operator run packet with brain routing,
+body worker selection, tool plan, build prompt, plan prompt, review prompt,
+test plan, acceptance checklist, and next action.
+
+### Quick Start
+
+```bash
+# 1. Initialize brain config (one-time setup)
+darwin brain-init
+
+# 2. Check which API keys are configured
+darwin brain-status
+
+# 3. Route a goal to see which worker to use (read-only, no files created)
+darwin brain-route --goal "add worker registry safely" --brain off
+
+# 4. Create a full operator run packet for an existing repo
+darwin operate-existing /path/to/repo --goal "add hello command safely" --brain off
+
+# 5. Use the generated prompts
+#    - Paste .darwin/runs/001-.../CLAUDE_BUILD_PROMPT.md into Claude Code
+#    - Paste .darwin/runs/001-.../CODEX_REVIEW_PROMPT.md into Codex after build
+#    - See NEXT_ACTION.md for the exact next step
+```
+
+### `darwin brain-init`
+
+Creates `.darwin/brain/` with config files. Never overwrites existing files.
+User edits survive reruns.
+
+Files created:
+- `.darwin/brain/BRAIN.md` — what brain is and isn't
+- `.darwin/brain/PROVIDERS.md` — supported providers and env vars
+- `.darwin/brain/SAFETY.md` — what is never sent to providers
+- `.darwin/brain/ROLES.md` — brain role and body worker definitions
+
+```bash
+darwin brain-init
+```
+
+### `darwin brain-status`
+
+Shows which API keys are configured (yes/no only — **never prints values**).
+Read-only. Does not create files or call APIs.
+
+```bash
+darwin brain-status
+```
+
+### `darwin brain-route --goal "..."`
+
+Routes a goal to the recommended brain role and body worker. Read-only — no
+files created, no workers called, no APIs called.
+
+```bash
+darwin brain-route --goal "add worker registry safely" --brain off
+darwin brain-route --goal "add worker registry safely" --brain auto
+darwin brain-route --goal "add worker registry safely" --brain groq
+```
+
+Options:
+- `--brain off` (default) — fully offline, deterministic
+- `--brain auto` — uses first available provider key; falls back to deterministic if no keys
+- `--brain groq|openrouter|poolside|nvidia` — specific provider; falls back if key missing
+
+### `darwin operate-existing <repo_path> --goal "..." --brain off`
+
+Creates a Darwin operator run packet inside the target repo at
+`.darwin/runs/NNN-<goal-slug>/`. All files are generated deterministically.
+**No workers, tools, or APIs are executed.**
+
+```bash
+darwin operate-existing /path/to/repo --goal "add hello command safely" --brain off
+darwin operate-existing /path/to/repo --goal "add hello command safely" --brain auto
+```
+
+Generated files inside the run folder:
+
+| File | Purpose |
+|---|---|
+| `RUN_SUMMARY.md` | Overview: goal, brain mode, worker, next action |
+| `BRAIN_ROUTE.md` | Route decision, provider availability, approval gates |
+| `BRAIN_PLAN.md` | Step-by-step plan for the run |
+| `PROJECT_BRIEF.md` | Detected project type and signals |
+| `REPO_MAP.md` | Top-level repo structure |
+| `BODY_WORKER_PLAN.md` | Worker roles and who acts when |
+| `TOOL_POLICY.md` | Tool rules (no execution in this chunk) |
+| `TASK_BREAKDOWN.md` | 3–7 concrete implementation steps |
+| `CLAUDE_BUILD_PROMPT.md` | Copy-paste ready Claude Code prompt |
+| `OPENCODE_PLAN_PROMPT.md` | Copy-paste ready OpenCode planning prompt |
+| `CODEX_REVIEW_PROMPT.md` | Copy-paste ready Codex review prompt |
+| `ACCEPTANCE_CHECKLIST.md` | Checklist before committing |
+| `TEST_PLAN.md` | Detected test commands |
+| `RISKS.md` | Detected risks |
+| `NEXT_ACTION.md` | One clear next step |
+| `TRACE.md` | What was and was not done |
+
+---
 
 ## Install
 

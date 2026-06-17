@@ -46,6 +46,8 @@ def op_status(base: Path) -> dict:
         ".darwin/tools/": (base / ".darwin" / "tools").exists(),
         ".darwin/features/": (base / ".darwin" / "features").exists(),
         ".darwin/workers/": (base / ".darwin" / "workers").exists(),
+        ".darwin/brain/": (base / ".darwin" / "brain").exists(),
+        ".darwin/runs/": (base / ".darwin" / "runs").exists(),
         "scripts/": (base / "scripts").exists(),
     }
     files = {
@@ -61,6 +63,7 @@ def op_status(base: Path) -> dict:
         "scripts/smoke_test_spec_surface.sh": (base / "scripts" / "smoke_test_spec_surface.sh").exists(),
         "scripts/smoke_test_tool_registry.sh": (base / "scripts" / "smoke_test_tool_registry.sh").exists(),
         "scripts/smoke_test_fast_track_bundle.sh": (base / "scripts" / "smoke_test_fast_track_bundle.sh").exists(),
+        "scripts/smoke_test_multi_brain_operator.sh": (base / "scripts" / "smoke_test_multi_brain_operator.sh").exists(),
     }
     _core = sys.modules.get("darwin.core")
     level = 0
@@ -144,6 +147,7 @@ def op_doctor(base: Path) -> list:
         "scripts/smoke_test_spec_surface.sh",
         "scripts/smoke_test_tool_registry.sh",
         "scripts/smoke_test_fast_track_bundle.sh",
+        "scripts/smoke_test_multi_brain_operator.sh",
     ]:
         if (base / script).exists():
             _chk(script, "PASS", "found")
@@ -166,6 +170,10 @@ def op_doctor(base: Path) -> list:
         ("op_worker_list", "Worker Registry"),
         ("op_worker_suggest", "Worker Registry"),
         ("op_batch_plan", "Batch Planner"),
+        ("op_brain_init", "Multi-Brain Operator"),
+        ("op_brain_status", "Multi-Brain Operator"),
+        ("op_brain_route", "Multi-Brain Operator"),
+        ("op_operate_existing", "Multi-Brain Operator"),
     ]:
         if _core and hasattr(_core, op_name):
             _chk(f"{op_name} ({label})", "PASS")
@@ -196,6 +204,12 @@ def op_doctor(base: Path) -> list:
         _chk(".darwin/workers/", "WARN", "not found — run: darwin worker-init")
     elif workers_dir.exists():
         _chk(".darwin/workers/", "PASS", "found")
+
+    brain_dir = base / ".darwin" / "brain"
+    if darwin_dir.exists() and not brain_dir.exists():
+        _chk(".darwin/brain/", "WARN", "not found — run: darwin brain-init")
+    elif brain_dir.exists():
+        _chk(".darwin/brain/", "PASS", "found")
 
     if _find_metadata_yaml(base):
         _chk("No metadata.yaml", "FAIL", "metadata.yaml found — remove it")

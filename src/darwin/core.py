@@ -89,3 +89,13 @@ from darwin.worker_registry_ops import (  # noqa: F401
 
 # ── batch planner ──────────────────────────────────────────────────────────────
 from darwin.batch_plan_ops import op_batch_plan  # noqa: F401
+
+# ── brain ops (Multi-Brain Operator V0) ────────────────────────────────────────
+from darwin.brain_ops import (  # noqa: F401
+    op_brain_init,
+    op_brain_route,
+    op_brain_status,
+)
+
+# ── operator run ───────────────────────────────────────────────────────────────
+from darwin.operator_ops import op_operate_existing  # noqa: F401

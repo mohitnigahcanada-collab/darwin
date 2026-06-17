@@ -12,6 +12,9 @@ from darwin.core import (
     _chunk_templates,
     now,
     op_batch_plan,
+    op_brain_init,
+    op_brain_route,
+    op_brain_status,
     op_doctor,
     op_eval_init,
     op_eval_list,
@@ -21,6 +24,7 @@ from darwin.core import (
     op_feature_list,
     op_feature_status,
     op_inspect_repo,
+    op_operate_existing,
     op_spec_init,
     op_spec_status,
     op_status,
@@ -570,6 +574,105 @@ def batch_plan(
     typer.echo(f"Fallback plan:    {result['fallback_plan']}")
     typer.echo("")
     typer.echo(f"Note: {result['disclaimer']}")
+
+
+@app.command("brain-init")
+def brain_init() -> None:
+    """Create .darwin/brain/ with brain config files. Never overwrites existing files."""
+    result = op_brain_init(Path("."))
+    typer.echo(f"brain dir: {result['brain_dir']}/")
+    for f in result["created"]:
+        typer.echo(f"created: .darwin/brain/{f}")
+    for f in result["existing"]:
+        typer.echo(f"exists:  .darwin/brain/{f}")
+
+
+@app.command("brain-status")
+def brain_status() -> None:
+    """Show brain config status. Never prints API key values."""
+    result = op_brain_status(Path("."))
+    typer.echo("Darwin Brain Status")
+    typer.echo("=" * 19)
+    typer.echo(f"brain dir: {'present' if result['brain_dir_present'] else 'missing (run: darwin brain-init)'}")
+    typer.echo("")
+    typer.echo("Brain files:")
+    for fname, present in result["files"].items():
+        typer.echo(f"  [{'x' if present else ' '}] .darwin/brain/{fname}")
+    typer.echo("")
+    typer.echo("Provider API keys (present = yes/no only — values never shown):")
+    for name, info in result["providers"].items():
+        key_status = "yes" if info["key_present"] else "no"
+        model_note = f"  model: {info['model_configured']}" if info["model_configured"] else ""
+        typer.echo(f"  {name:<12} key: {key_status:<4}  ({info['key_env_var']}){model_note}")
+    typer.echo("")
+    if result["any_key_present"]:
+        typer.echo("At least one API key is configured.")
+    else:
+        typer.echo("No API keys configured. Brain mode 'off' will be used.")
+    typer.echo("")
+    typer.echo("Reminder: API keys are environment variables only. Never stored in .darwin/.")
+
+
+@app.command("brain-route")
+def brain_route(
+    goal: str = typer.Option(..., help="Your goal or task description."),
+    repo_path: str = typer.Option(None, "--repo-path", help="Optional repo path for context."),
+    brain: str = typer.Option("off", "--brain", help="Brain mode: off, auto, groq, openrouter, poolside, nvidia."),
+) -> None:
+    """Route a goal to brain role and body worker. Read-only, no files created."""
+    result = op_brain_route(goal, brain=brain, repo_path=repo_path)
+    if "error" in result:
+        typer.echo(f"error: {result['error']}", err=True)
+        raise typer.Exit(1)
+    typer.echo("Darwin Brain Route")
+    typer.echo("=" * 18)
+    typer.echo(f"Goal:              {result['goal']}")
+    typer.echo(f"Brain mode:        {result['brain_mode']}")
+    typer.echo(f"Route method:      {result['route_method']}")
+    typer.echo("")
+    typer.echo("Provider availability:")
+    for name, present in result["provider_availability"].items():
+        typer.echo(f"  {name:<12} {'yes' if present else 'no'}")
+    typer.echo("")
+    typer.echo(f"Task type:         {result['task_type']}")
+    typer.echo(f"Risk level:        {result['risk']}")
+    typer.echo(f"Brain role:        {result['brain_role']}")
+    typer.echo(f"Body worker:       {result['body_worker']}")
+    typer.echo(f"Approval:          {result['approval_requirement']}")
+    typer.echo("")
+    if result["provider_note"]:
+        typer.echo(f"Note: {result['provider_note']}")
+        typer.echo("")
+    typer.echo(f"Next step: {result['next_step']}")
+
+
+@app.command("operate-existing")
+def operate_existing(
+    repo_path: Path = typer.Argument(..., help="Path to the target repo."),
+    goal: str = typer.Option(..., help="Your goal for this operator run."),
+    brain: str = typer.Option("off", "--brain", help="Brain mode: off, auto, groq, openrouter, poolside, nvidia."),
+) -> None:
+    """Create a Darwin operator run packet for an existing repo. No workers or tools are executed."""
+    result = op_operate_existing(repo_path, goal, brain=brain)
+    if "error" in result:
+        typer.echo(f"error: {result['error']}", err=True)
+        raise typer.Exit(1)
+    typer.echo("Darwin Operator Run")
+    typer.echo("=" * 19)
+    typer.echo(f"Repo:    {result['repo']}")
+    typer.echo(f"Goal:    {result['goal']}")
+    typer.echo(f"Brain:   {result['brain']}")
+    typer.echo(f"Run dir: {result['run_dir']}/")
+    typer.echo("")
+    typer.echo("Created files:")
+    for f in result["created"]:
+        typer.echo(f"  {f}")
+    typer.echo("")
+    typer.echo(f"Route:   {result['route']['route_method']}")
+    typer.echo(f"Worker:  {result['route']['body_worker']}")
+    typer.echo("")
+    typer.echo("Warning: No workers, tools, or APIs were executed.")
+    typer.echo("Next:    See NEXT_ACTION.md in the run folder.")
 
 
 if __name__ == "__main__":
