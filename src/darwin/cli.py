@@ -17,7 +17,12 @@ from darwin.core import (
     op_eval_report,
     op_eval_run,
     op_inspect_repo,
+    op_spec_init,
+    op_spec_status,
     op_status,
+    op_tool_init,
+    op_tool_list,
+    op_tool_suggest,
     op_update_memory,
     op_version,
     parse_task_text,
@@ -249,6 +254,92 @@ def inspect_repo(
         typer.echo(f"created: .darwin/{f}")
     for f in result["existing"]:
         typer.echo(f"exists:  .darwin/{f}")
+
+
+@app.command("spec-init")
+def spec_init() -> None:
+    """Create .darwin/spec/ with contract files. Never overwrites existing files."""
+    result = op_spec_init(Path("."))
+    typer.echo(f"spec dir: {result['spec_dir']}/")
+    for f in result["created"]:
+        typer.echo(f"created: .darwin/spec/{f}")
+    for f in result["existing"]:
+        typer.echo(f"exists:  .darwin/spec/{f}")
+
+
+@app.command("spec-status")
+def spec_status() -> None:
+    """Show spec surface status (.darwin/spec/)."""
+    result = op_spec_status(Path("."))
+    if not result["initialized"]:
+        typer.echo(result["message"])
+        raise typer.Exit(1)
+    typer.echo("Spec Surface")
+    typer.echo("=" * 12)
+    typer.echo(f"spec dir: {result['spec_dir']}/")
+    typer.echo("")
+    typer.echo("Files:")
+    for fname, present in result["files"].items():
+        typer.echo(f"  [{'x' if present else ' '}] .darwin/spec/{fname}")
+    typer.echo("")
+    typer.echo(f"Protected commands: {result['protected_command_count']}")
+
+
+@app.command("tool-init")
+def tool_init() -> None:
+    """Create .darwin/tools/ with tool cards. Never overwrites existing cards."""
+    result = op_tool_init(Path("."))
+    typer.echo(f"tools dir: {result['tools_dir']}/")
+    for f in result["created"]:
+        typer.echo(f"created: .darwin/tools/{f}")
+    for f in result["existing"]:
+        typer.echo(f"exists:  .darwin/tools/{f}")
+
+
+@app.command("tool-list")
+def tool_list() -> None:
+    """List tool cards in .darwin/tools/ with type, risk, and approval."""
+    result = op_tool_list(Path("."))
+    if not result["initialized"]:
+        typer.echo(result["message"])
+        raise typer.Exit(1)
+    typer.echo("Tool Registry")
+    typer.echo("=" * 13)
+    typer.echo(f"Tools in {result['tools_dir']}/ ({result['count']}):")
+    typer.echo("")
+    for t in result["tools"]:
+        typer.echo(f"  {t['filename']}")
+        typer.echo(f"    Type:     {t['type']}")
+        typer.echo(f"    Risk:     {t['risk']}")
+        typer.echo(f"    Approval: {t['approval']}")
+
+
+@app.command("tool-suggest")
+def tool_suggest(
+    goal: str = typer.Option(..., help="Your goal or task description."),
+) -> None:
+    """Suggest tools for a goal using deterministic keyword matching."""
+    result = op_tool_suggest(Path("."), goal)
+    typer.echo("Tool Suggestions")
+    typer.echo("=" * 16)
+    typer.echo(f"Goal: {result['goal']}")
+    typer.echo("")
+    if not result["matches"]:
+        typer.echo("No tools matched this goal.")
+    else:
+        typer.echo(f"Recommended tools ({result['total_matched']}):")
+        typer.echo("")
+        for m in result["matches"]:
+            kw_str = ", ".join(m["matched_keywords"])
+            typer.echo(f"  {m['tool']}")
+            typer.echo(f"    Matched:  {kw_str}")
+            typer.echo(f"    Risk:     {m['risk']}")
+            typer.echo(f"    Approval: {m['approval']}")
+        typer.echo("")
+    if result["warning"]:
+        typer.echo(f"Warning: {result['warning']}")
+        typer.echo("")
+    typer.echo(result["disclaimer"])
 
 
 @app.command("eval-init")

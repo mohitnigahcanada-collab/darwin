@@ -223,6 +223,75 @@ darwin doctor
 
 ---
 
+## Tool Registry V0
+
+A local deterministic catalog of tools, MCPs, and workers that Darwin may suggest for a task. Does not install, configure, or run any tool.
+
+```bash
+darwin tool-init                             # create .darwin/tools/ (idempotent)
+darwin tool-list                             # list all cards with type/risk/approval
+darwin tool-suggest --goal "build React UI"  # keyword-based suggestions
+```
+
+### What it does
+
+- `tool-init` creates one Markdown card per tool under `.darwin/tools/`. Cards describe type, risk level, when to wake a tool, and whether approval is required. Never overwrites existing cards — user edits survive reruns.
+- `tool-list` reads all cards and prints a table of name / type / risk / approval.
+- `tool-suggest` matches your goal against a built-in keyword map and returns up to 5 suggestions with risk and approval notes. Fully deterministic — no LLM, no network.
+
+### What it does NOT do
+
+- Does not install any MCP server.
+- Does not configure OpenCode or any agent.
+- Does not run any tool.
+- Does not call any network or LLM API.
+
+### Registered tools
+
+| Card | Type | Risk |
+|---|---|---|
+| `darwin_chunk_mcp.md` | MCP / Internal | low |
+| `context7_docs_mcp.md` | MCP | medium |
+| `proxima_research_mcp.md` | MCP | high |
+| `github_mcp.md` | MCP | medium |
+| `playwright_mcp.md` | MCP | medium |
+| `chrome_devtools_mcp.md` | MCP | medium |
+| `semgrep_mcp.md` | MCP | medium |
+| `osv_mcp.md` | MCP | medium |
+| `supabase_mcp.md` | MCP | high |
+| `postgres_mcp.md` | MCP | high |
+| `docker_mcp.md` | MCP | high |
+| `opencode_worker.md` | Worker | high |
+| `claude_code_worker.md` | Worker | medium |
+| `codex_reviewer.md` | Reviewer | low |
+
+`darwin doctor` warns if `.darwin/` exists without a `.darwin/tools/` directory.
+
+---
+
+## Spec Surface V0
+
+A read-only contract document describing exactly what Darwin supports, which scenarios are protected, and which commands have smoke test coverage. Run once per repo.
+
+```bash
+darwin spec-init    # create .darwin/spec/ (idempotent, never overwrites)
+darwin spec-status  # show spec file presence and protected command count
+```
+
+### Files created under `.darwin/spec/`
+
+| File | Contents |
+|---|---|
+| `SPEC_SURFACE.md` | Project name, Darwin level, supported command groups, unsupported features |
+| `SCENARIOS.md` | Each protected user scenario with its smoke test reference |
+| `PROTECTED_COMMANDS.md` | Every Darwin command mapped to its covering smoke test |
+
+User edits to these files survive a rerun of `spec-init`.
+
+`darwin doctor` warns (but does not fail) if `.darwin/` exists without a `.darwin/spec/` directory.
+
+---
+
 ## Existing Repo Intake V0
 
 Inspect an existing project and let Darwin build a `.darwin/` understanding pack
@@ -325,6 +394,8 @@ bash scripts/smoke_test_chunk_os.sh        # full CLI loop
 bash scripts/smoke_test_repo_intake.sh     # repo intake
 bash scripts/smoke_test_eval_harness.sh    # eval harness
 bash scripts/smoke_test_status_doctor.sh   # version / status / doctor
+bash scripts/smoke_test_spec_surface.sh    # spec-init / spec-status
+bash scripts/smoke_test_tool_registry.sh   # tool-init / tool-list / tool-suggest
 python scripts/smoke_test_mcp_tools.py     # MCP tool functions
 ```
 
