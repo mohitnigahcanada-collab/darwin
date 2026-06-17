@@ -1,41 +1,37 @@
-import re
-from datetime import datetime
 from pathlib import Path
 
 import typer
 
+from darwin.core import (
+    FORBIDDEN_FILES,
+    INIT_DIRS,
+    INIT_FILES,
+    OPTIONAL_FILES,
+    REQUIRED_FILES,
+    VALID_STATUSES,
+    _chunk_templates,
+    now,
+    op_update_memory,
+    parse_task_text,
+    slug,
+    write_if_missing,
+)
+
 app = typer.Typer(help="Darwin CLI.", no_args_is_help=True)
-
-INIT_DIRS = ["chunks", "memory", "templates", "reports"]
-
-INIT_FILES = {
-    "MASTER_PLAN.md": (
-        "# Master Plan\n\n"
-        "Example plan:\n\n"
-        "- Build the smallest CLI skeleton.\n"
-        "- Set up the workspace files.\n"
-        "- Split the plan into chunks.\n"
-    ),
-    "ROADMAP.md": (
-        "# Roadmap\n\n"
-        "Roadmap is not generated yet.\n"
-    ),
-    "memory/mistakes.md": "# Mistakes\n",
-    "memory/winners.md": "# Winners\n",
-    "memory/decisions.md": "# Decisions\n",
-}
-
-
-def _slug(text: str, max_len: int = 40) -> str:
-    text = text.lower()
-    text = re.sub(r"[^a-z0-9\s-]", "", text)
-    text = re.sub(r"\s+", "-", text.strip())
-    return text[:max_len].rstrip("-")
 
 
 @app.callback()
 def main() -> None:
     """Darwin CLI."""
+
+
+def _check_chunk(chunk_path: Path) -> None:
+    if not chunk_path.exists():
+        typer.echo(f"error: chunk folder not found: {chunk_path}", err=True)
+        raise typer.Exit(1)
+    if not (chunk_path / "TASK.md").exists():
+        typer.echo(f"error: TASK.md not found in {chunk_path}", err=True)
+        raise typer.Exit(1)
 
 
 @app.command()
@@ -45,7 +41,6 @@ def init() -> None:
         path = Path(name)
         path.mkdir(parents=True, exist_ok=True)
         typer.echo(f"ready:   {path}/")
-
     for name, content in INIT_FILES.items():
         path = Path(name)
         if path.exists():
@@ -64,28 +59,23 @@ def split_plan(
         typer.echo(f"error: file not found: {plan_file}", err=True)
         raise typer.Exit(1)
 
-    lines = plan_file.read_text().splitlines()
-    tasks = []
-    for line in lines:
-        if line.startswith("- ") or line.startswith("* "):
-            task = line[2:].strip()
-            if task:
-                tasks.append(task)
-
+    tasks = [
+        line[2:].strip()
+        for line in plan_file.read_text().splitlines()
+        if (line.startswith("- ") or line.startswith("* ")) and line[2:].strip()
+    ]
     if not tasks:
         typer.echo("No bullet tasks found in the plan. Nothing was changed.")
         return
 
     typer.echo(f"Found {len(tasks)} task(s):\n")
-
     roadmap_lines = ["# Roadmap", "", "## Pending Tasks", ""]
 
     for i, task in enumerate(tasks, 1):
         num = f"{i:03d}"
-        folder_name = f"{num}-{_slug(task)}"
+        folder_name = f"{num}-{slug(task)}"
         folder_path = Path("chunks") / folder_name
         task_file = folder_path / "TASK.md"
-
         folder_path.mkdir(parents=True, exist_ok=True)
 
         if task_file.exists():
@@ -100,7 +90,6 @@ def split_plan(
 
         typer.echo(f"  {num} — {task}")
         typer.echo(f"       {folder_path}/ [{file_status} TASK.md]")
-
         roadmap_lines.append(f"- [ ] {num} — {task} — `{folder_path}/`")
 
     Path("ROADMAP.md").write_text("\n".join(roadmap_lines) + "\n")
@@ -108,198 +97,17 @@ def split_plan(
     typer.echo(f"done:    chunks/ ({len(tasks)} folder(s))")
 
 
-def _parse_task_text(task_md: str) -> str:
-    """Extract the task text from TASK.md content."""
-    for line in task_md.splitlines():
-        if line.startswith("**Task:**"):
-            return line.removeprefix("**Task:**").strip()
-    return "(task text not found)"
-
-
-def _write_if_missing(path: Path, content: str) -> str:
-    """Write content to path only if it does not exist. Returns 'created' or 'exists'."""
-    if path.exists():
-        return "exists"
-    path.write_text(content)
-    return "created"
-
-
 @app.command("prepare-chunk")
 def prepare_chunk(
-    chunk_path: Path = typer.Argument(..., help="Path to the chunk folder, e.g. chunks/001-example-task"),
+    chunk_path: Path = typer.Argument(..., help="Path to the chunk folder."),
 ) -> None:
     """Create STEP.md, CONTEXT.md, CLAUDE_PROMPT.md, CODEX_REVIEW_PROMPT.md, ACCEPTANCE.md, and TESTS.md."""
-    if not chunk_path.exists():
-        typer.echo(f"error: chunk folder not found: {chunk_path}", err=True)
-        raise typer.Exit(1)
-
-    task_file = chunk_path / "TASK.md"
-    if not task_file.exists():
-        typer.echo(f"error: TASK.md not found in {chunk_path}", err=True)
-        raise typer.Exit(1)
-
-    task_text = _parse_task_text(task_file.read_text())
-    chunk_name = chunk_path.name
-
-    files: list[tuple[Path, str]] = [
-        (
-            chunk_path / "STEP.md",
-            f"# STEP — {chunk_name}\n\n"
-            f"## Goal\n\n"
-            f"{task_text}\n\n"
-            f"## Scope\n\n"
-            f"<!-- What is in scope for this chunk? -->\n\n"
-            f"## Inputs\n\n"
-            f"<!-- What files or information does this chunk start with? -->\n\n"
-            f"## Outputs\n\n"
-            f"<!-- What files or results should this chunk produce? -->\n\n"
-            f"## Acceptance Criteria\n\n"
-            f"- [ ] <!-- Add acceptance criteria here -->\n\n"
-            f"## Notes\n\n"
-            f"<!-- Any extra notes, constraints, or decisions -->\n",
-        ),
-        (
-            chunk_path / "CONTEXT.md",
-            f"# CONTEXT — {chunk_name}\n\n"
-            f"## Task Summary\n\n"
-            f"{task_text}\n\n"
-            f"## Current Project State\n\n"
-            f"<!-- Describe what already exists in the project that is relevant -->\n\n"
-            f"## Files Likely Involved\n\n"
-            f"<!-- List files this chunk will read or modify -->\n\n"
-            f"## Constraints\n\n"
-            f"- Do not overbuild.\n"
-            f"- Only implement what this chunk requires.\n"
-            f"- Do not add features planned for later chunks.\n",
-        ),
-        (
-            chunk_path / "CLAUDE_PROMPT.md",
-            f"# Claude Prompt — {chunk_name}\n\n"
-            f"## Task Goal\n\n"
-            f"{task_text}\n\n"
-            f"## Scope\n\n"
-            f"<!-- Fill in from STEP.md -->\n\n"
-            f"## Allowed Changes\n\n"
-            f"<!-- List the files and changes that are in scope -->\n\n"
-            f"## Forbidden\n\n"
-            f"- Do not implement features planned for later chunks.\n"
-            f"- Do not overbuild.\n"
-            f"- Do not modify files outside this chunk's scope.\n\n"
-            f"## Acceptance Criteria\n\n"
-            f"<!-- Copy from STEP.md -->\n\n"
-            f"## Test Instructions\n\n"
-            f"<!-- Describe exact commands to verify this chunk works -->\n\n"
-            f"## Output Required\n\n"
-            f"After completing the task, show:\n\n"
-            f"1. Files changed\n"
-            f"2. Exact test commands\n"
-            f"3. Test output\n"
-            f"4. What was intentionally not built\n",
-        ),
-        (
-            chunk_path / "CODEX_REVIEW_PROMPT.md",
-            f"# Codex Review Prompt — {chunk_name}\n\n"
-            f"You are a strict senior code reviewer.\n\n"
-            f"## Your Role\n\n"
-            f"Review the implementation of this chunk and determine PASS or FAIL.\n\n"
-            f"## Chunk Goal\n\n"
-            f"{task_text}\n\n"
-            f"## Scope Guard\n\n"
-            f"This chunk must only implement what is listed in STEP.md.\n"
-            f"Reject anything beyond the stated scope.\n\n"
-            f"## Expected Files\n\n"
-            f"<!-- List the files that should have been created or changed -->\n\n"
-            f"## Overbuild Check\n\n"
-            f"- [ ] No features added beyond chunk scope\n"
-            f"- [ ] No files created that were not required\n"
-            f"- [ ] No abstractions added prematurely\n\n"
-            f"## Test Checklist\n\n"
-            f"- [ ] Required files exist\n"
-            f"- [ ] Existing user files were not overwritten\n"
-            f"- [ ] Command runs without error\n"
-            f"- [ ] Running command twice does not crash\n\n"
-            f"## Output Format\n\n"
-            f"Respond with exactly one of:\n\n"
-            f"```\n"
-            f"PASS — <one line reason>\n"
-            f"```\n\n"
-            f"or\n\n"
-            f"```\n"
-            f"FAIL — <one line reason>\n"
-            f"       <specific item that failed>\n"
-            f"```\n",
-        ),
-        (
-            chunk_path / "ACCEPTANCE.md",
-            f"# Acceptance — {chunk_name}\n\n"
-            f"## Checklist\n\n"
-            f"- [ ] Chunk goal is satisfied: {task_text}\n"
-            f"- [ ] Required files were created or changed\n"
-            f"- [ ] Existing user files were not overwritten\n"
-            f"- [ ] All tests pass\n"
-            f"- [ ] README is accurate (if changed)\n"
-            f"- [ ] No future features were added\n",
-        ),
-        (
-            chunk_path / "TESTS.md",
-            f"# Tests — {chunk_name}\n\n"
-            f"## Install\n\n"
-            f"```bash\n"
-            f"python -m venv .venv && source .venv/bin/activate\n"
-            f"pip install -e .\n"
-            f"```\n\n"
-            f"## Run\n\n"
-            f"```bash\n"
-            f"# TODO: fill in the relevant CLI command for this chunk\n"
-            f"darwin <command> <args>\n"
-            f"```\n\n"
-            f"## Idempotency Test\n\n"
-            f"```bash\n"
-            f"# Run the command twice and confirm no crash and no data loss\n"
-            f"darwin <command> <args>\n"
-            f"darwin <command> <args>\n"
-            f"```\n\n"
-            f"## Error Cases\n\n"
-            f"```bash\n"
-            f"# Missing file or folder\n"
-            f"darwin <command> missing-path\n"
-            f"# Expected: clean error message, exit code 1, no traceback\n"
-            f"```\n",
-        ),
-    ]
-
-    for path, content in files:
-        status = _write_if_missing(path, content)
-        typer.echo(f"{status + ':':<9} {path}")
-
-
-VALID_STATUSES = {"pass", "fail", "blocked"}
-
-REQUIRED_FILES = [
-    "TASK.md",
-    "STEP.md",
-    "CONTEXT.md",
-    "CLAUDE_PROMPT.md",
-    "CODEX_REVIEW_PROMPT.md",
-    "ACCEPTANCE.md",
-    "TESTS.md",
-]
-OPTIONAL_FILES = ["RESULT.md"]
-FORBIDDEN_FILES = ["MEMORY_UPDATE.md", "metadata.yaml"]
-
-
-def _check_chunk(chunk_path: Path) -> None:
-    """Raise a clean error if chunk folder or TASK.md is missing."""
-    if not chunk_path.exists():
-        typer.echo(f"error: chunk folder not found: {chunk_path}", err=True)
-        raise typer.Exit(1)
-    if not (chunk_path / "TASK.md").exists():
-        typer.echo(f"error: TASK.md not found in {chunk_path}", err=True)
-        raise typer.Exit(1)
-
-
-def _now() -> str:
-    return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    _check_chunk(chunk_path)
+    task_text = parse_task_text((chunk_path / "TASK.md").read_text())
+    templates = _chunk_templates(chunk_path.name, task_text)
+    for filename, content in templates.items():
+        status = write_if_missing(chunk_path / filename, content)
+        typer.echo(f"{status + ':':<9} {chunk_path / filename}")
 
 
 @app.command("record-result")
@@ -310,7 +118,6 @@ def record_result(
 ) -> None:
     """Record a result entry (pass/fail/blocked) for a chunk."""
     _check_chunk(chunk_path)
-
     if status not in VALID_STATUSES:
         typer.echo(
             f"error: invalid status '{status}'. Choose from: {', '.join(sorted(VALID_STATUSES))}",
@@ -318,18 +125,15 @@ def record_result(
         )
         raise typer.Exit(1)
 
-    task_text = _parse_task_text((chunk_path / "TASK.md").read_text())
+    task_text = parse_task_text((chunk_path / "TASK.md").read_text())
     result_file = chunk_path / "RESULT.md"
-    timestamp = _now()
-
     entry = (
-        f"\n## Result — {timestamp}\n\n"
+        f"\n## Result — {now()}\n\n"
         f"**Chunk:** {chunk_path}\n"
         f"**Task:** {task_text}\n"
         f"**Status:** {status.upper()}\n"
         f"**Notes:** {notes or '(none)'}\n"
     )
-
     if result_file.exists():
         result_file.write_text(result_file.read_text() + entry)
         typer.echo(f"appended: {result_file}")
@@ -344,96 +148,36 @@ def review_chunk(
 ) -> None:
     """Run local file checks on a chunk and write REVIEW.md."""
     _check_chunk(chunk_path)
-
-    timestamp = _now()
-    lines: list[str] = []
-
-    lines.append(f"## Review — {timestamp}\n")
-    lines.append("### Required Files\n")
-    all_required_present = True
+    timestamp = now()
+    lines: list[str] = [f"## Review — {timestamp}\n", "### Required Files\n"]
+    all_required = True
     for name in REQUIRED_FILES:
         present = (chunk_path / name).exists()
-        mark = "x" if present else " "
-        lines.append(f"- [{mark}] {name}")
+        lines.append(f"- [{'x' if present else ' '}] {name}")
         if not present:
-            all_required_present = False
-
+            all_required = False
     lines.append("\n### Optional Files\n")
     for name in OPTIONAL_FILES:
         present = (chunk_path / name).exists()
-        mark = "x" if present else " "
-        lines.append(f"- [{mark}] {name}")
-
+        lines.append(f"- [{'x' if present else ' '}] {name}")
     lines.append("\n### Forbidden Files\n")
-    any_forbidden_present = False
+    any_forbidden = False
     for name in FORBIDDEN_FILES:
         present = (chunk_path / name).exists()
-        mark = "x" if present else " "
-        lines.append(f"- [{mark}] {name} {'← PRESENT (forbidden)' if present else ''}")
+        lines.append(f"- [{'x' if present else ' '}] {name}{' ← PRESENT (forbidden)' if present else ''}")
         if present:
-            any_forbidden_present = True
-
-    verdict = "PASS" if (all_required_present and not any_forbidden_present) else "FAIL"
+            any_forbidden = True
+    verdict = "PASS" if (all_required and not any_forbidden) else "FAIL"
     lines.append(f"\n### Verdict: {verdict}\n")
-
     entry = "\n".join(lines) + "\n"
     review_file = chunk_path / "REVIEW.md"
-
     if review_file.exists():
         review_file.write_text(review_file.read_text() + "\n---\n\n" + entry)
         typer.echo(f"appended: {review_file}")
     else:
         review_file.write_text(f"# Review — {chunk_path.name}\n\n" + entry)
         typer.echo(f"created:  {review_file}")
-
     typer.echo(f"verdict:  {verdict}")
-
-
-def _parse_latest_result_status(result_md: str) -> str | None:
-    """Return the latest status from RESULT.md (lower-case)."""
-    status = None
-    for line in result_md.splitlines():
-        if line.startswith("**Status:**"):
-            status = line.removeprefix("**Status:**").strip().lower()
-    return status
-
-
-def _parse_latest_review_verdict(review_md: str) -> str | None:
-    """Return the latest verdict from REVIEW.md."""
-    verdict = None
-    for line in review_md.splitlines():
-        if line.startswith("### Verdict:"):
-            verdict = line.removeprefix("### Verdict:").strip()
-    return verdict
-
-
-def _ensure_memory_file(path: Path, heading: str) -> None:
-    if not path.exists():
-        Path("memory").mkdir(exist_ok=True)
-        path.write_text(f"{heading}\n")
-
-
-def _append_memory(path: Path, heading: str, entry: str) -> None:
-    _ensure_memory_file(path, heading)
-    path.write_text(path.read_text() + entry)
-
-
-def _mark_roadmap_done(chunk_path: Path) -> bool:
-    """Mark the chunk's ROADMAP.md line from [ ] to [x]. Returns True if found."""
-    roadmap = Path("ROADMAP.md")
-    if not roadmap.exists():
-        return False
-    slug = chunk_path.name + "/"
-    lines = roadmap.read_text().splitlines()
-    changed = False
-    for i, line in enumerate(lines):
-        if "- [ ]" in line and slug in line:
-            lines[i] = line.replace("- [ ]", "- [x]", 1)
-            changed = True
-            break
-    if changed:
-        roadmap.write_text("\n".join(lines) + "\n")
-    return changed
 
 
 @app.command("update-memory")
@@ -442,61 +186,20 @@ def update_memory(
 ) -> None:
     """Append memory entries from a chunk result and mark ROADMAP.md if passing."""
     _check_chunk(chunk_path)
-
-    for required in ("RESULT.md", "REVIEW.md"):
-        if not (chunk_path / required).exists():
-            typer.echo(f"error: {required} not found in {chunk_path}", err=True)
+    for req in ("RESULT.md", "REVIEW.md"):
+        if not (chunk_path / req).exists():
+            typer.echo(f"error: {req} not found in {chunk_path}", err=True)
             raise typer.Exit(1)
 
-    task_text = _parse_task_text((chunk_path / "TASK.md").read_text())
-    result_status = _parse_latest_result_status((chunk_path / "RESULT.md").read_text())
-    review_verdict = _parse_latest_review_verdict((chunk_path / "REVIEW.md").read_text())
-    timestamp = _now()
-
-    is_pass = result_status == "pass" and review_verdict == "PASS"
+    result = op_update_memory(Path("."), str(chunk_path))
+    if "error" in result:
+        typer.echo(f"error: {result['error']}", err=True)
+        raise typer.Exit(1)
 
     typer.echo(f"chunk:   {chunk_path}")
-    typer.echo(f"result:  {result_status}  |  review: {review_verdict}")
-
-    if is_pass:
-        entry = (
-            f"\n## {timestamp} — {chunk_path.name}\n\n"
-            f"Task: {task_text}\n"
-            f"Outcome: passed review\n"
-        )
-        _append_memory(Path("memory/winners.md"), "# Winners", entry)
-        typer.echo("appended: memory/winners.md")
-
-        decision_entry = (
-            f"\n## {timestamp} — {chunk_path.name}\n\n"
-            f"Task: {task_text}\n"
-            f"Decision: accepted — passed result and review\n"
-        )
-        _append_memory(Path("memory/decisions.md"), "# Decisions", decision_entry)
-        typer.echo("appended: memory/decisions.md")
-
-        if _mark_roadmap_done(chunk_path):
-            typer.echo("marked:   ROADMAP.md [x]")
-        else:
-            typer.echo("note:     ROADMAP.md line not found — skipped")
-    else:
-        reason = f"result={result_status}, review={review_verdict}"
-        entry = (
-            f"\n## {timestamp} — {chunk_path.name}\n\n"
-            f"Task: {task_text}\n"
-            f"Outcome: {reason}\n"
-        )
-        _append_memory(Path("memory/mistakes.md"), "# Mistakes", entry)
-        typer.echo("appended: memory/mistakes.md")
-
-        decision_entry = (
-            f"\n## {timestamp} — {chunk_path.name}\n\n"
-            f"Task: {task_text}\n"
-            f"Decision: not accepted — {reason}\n"
-        )
-        _append_memory(Path("memory/decisions.md"), "# Decisions", decision_entry)
-        typer.echo("appended: memory/decisions.md")
-        typer.echo("note:     ROADMAP.md not marked (chunk did not pass)")
+    typer.echo(f"result:  {result['result_status']}  |  review: {result['review_verdict']}")
+    for action in result["actions"]:
+        typer.echo(f"{'marked:' if 'ROADMAP' in action and '[x]' in action else 'appended:' if 'appended' in action else 'note:    '} {action}")
 
 
 @app.command("next-chunk")
@@ -506,24 +209,19 @@ def next_chunk() -> None:
     if not roadmap.exists():
         typer.echo("error: ROADMAP.md not found. Run `darwin split-plan` first.", err=True)
         raise typer.Exit(1)
-
+    import re
     for line in roadmap.read_text().splitlines():
         if not line.startswith("- [ ]"):
             continue
-        # extract backtick path: `chunks/001-foo/`
         match = re.search(r"`(chunks/[^`]+)`", line)
         chunk_path = match.group(1).rstrip("/") if match else None
-
-        # extract summary: text between first — and last —
         parts = line.lstrip("- [ ]").strip().split(" — ")
         summary = " — ".join(parts[:-1]) if len(parts) > 1 else parts[0]
-
         typer.echo(f"next chunk:  {summary.strip()}")
         if chunk_path:
             typer.echo(f"path:        {chunk_path}")
             typer.echo(f"run:         darwin prepare-chunk {chunk_path}")
         return
-
     typer.echo("No pending chunks. All tasks are done or ROADMAP.md has no unchecked items.")
 
 

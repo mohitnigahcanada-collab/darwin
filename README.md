@@ -151,11 +151,61 @@ darwin update-memory chunks/001-build-the-cli-skeleton
 
 ---
 
-## Smoke Test
+## Smoke Tests
 
 ```bash
 source .venv/bin/activate
-bash scripts/smoke_test_chunk_os.sh
+bash scripts/smoke_test_chunk_os.sh        # full CLI loop
+python scripts/smoke_test_mcp_tools.py     # MCP tool functions
 ```
 
-Runs a full V1 loop in a temp directory and verifies all acceptance criteria.
+---
+
+## Using Chunk OS through MCP
+
+Darwin exposes all Chunk OS operations as MCP tools so Claude Code and other
+MCP-capable agents can drive the full loop without a shell.
+
+### Install
+
+```bash
+pip install "darwin[mcp]"
+```
+
+### Start the server
+
+```bash
+darwin-mcp
+# or
+python -m darwin.mcp_server
+```
+
+### Add to Claude Code
+
+```json
+{
+  "mcpServers": {
+    "darwin": {
+      "command": "darwin-mcp"
+    }
+  }
+}
+```
+
+### Available MCP tools
+
+| Tool | Description |
+|---|---|
+| `list_chunks(project_path)` | List all chunk folders |
+| `next_chunk(project_path)` | First unchecked chunk from ROADMAP.md |
+| `prepare_chunk(project_path, chunk_path)` | Create STEP.md, CLAUDE_PROMPT.md, etc. |
+| `read_chunk_files(project_path, chunk_path)` | Return all file contents in a chunk |
+| `get_builder_prompt(project_path, chunk_path)` | Return CLAUDE_PROMPT.md content |
+| `get_review_prompt(project_path, chunk_path)` | Return CODEX_REVIEW_PROMPT.md content |
+| `record_result(project_path, chunk_path, status, notes)` | Record pass/fail/blocked |
+| `review_chunk(project_path, chunk_path)` | Run local file checks, write REVIEW.md |
+| `update_memory(project_path, chunk_path)` | Update memory files, mark ROADMAP done |
+
+All tools are read/write local file operations only — no network calls, no LLM
+API calls, no shell execution. Chunk paths must stay inside the supplied
+project path; `..` path escapes are rejected.
