@@ -15,6 +15,7 @@ from darwin.core import (
     op_eval_list,
     op_eval_report,
     op_eval_run,
+    op_inspect_repo,
     op_update_memory,
     parse_task_text,
     slug,
@@ -227,6 +228,24 @@ def next_chunk() -> None:
             typer.echo(f"run:         darwin prepare-chunk {chunk_path}")
         return
     typer.echo("No pending chunks. All tasks are done or ROADMAP.md has no unchecked items.")
+
+
+@app.command("inspect-repo")
+def inspect_repo(
+    repo_path: Path = typer.Argument(..., help="Path to the repo to inspect."),
+    goal: str = typer.Option(..., help="Your goal for this project."),
+) -> None:
+    """Inspect a repo and create a .darwin/ understanding pack."""
+    result = op_inspect_repo(repo_path.resolve(), goal)
+    if "error" in result:
+        typer.echo(f"error: {result['error']}", err=True)
+        raise typer.Exit(1)
+    typer.echo(f"repo:   {result['repo']}")
+    typer.echo(f"output: {result['darwin_dir']}/")
+    for f in result["created"]:
+        typer.echo(f"created: .darwin/{f}")
+    for f in result["existing"]:
+        typer.echo(f"exists:  .darwin/{f}")
 
 
 @app.command("eval-init")

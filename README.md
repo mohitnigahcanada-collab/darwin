@@ -153,6 +153,40 @@ darwin update-memory chunks/001-build-the-cli-skeleton
 
 ---
 
+## Repo Intake V0
+
+Inspect an existing project and let Darwin build a `.darwin/` understanding pack
+before any coding starts. No LLM calls — deterministic file scanning only.
+
+```bash
+darwin inspect-repo . --goal "improve CLI tests"
+darwin inspect-repo /path/to/project --goal "add authentication"
+```
+
+### Output files
+
+| File | Contents |
+|---|---|
+| `.darwin/PROJECT_BRIEF.md` | Repo path, user goal, detected project type, summary, timestamp |
+| `.darwin/REPO_MAP.md` | Top-level file tree (noisy dirs excluded) and important files |
+| `.darwin/COMMANDS.md` | Detected install / test / run commands with caveats |
+| `.darwin/RISK_LIST.md` | Missing README, missing tests, no lockfile, etc. |
+| `.darwin/UNKNOWN_QUESTIONS.md` | What Darwin could not determine; questions to answer before coding |
+| `.darwin/MASTER_PLAN_DRAFT.md` | Chunkable bullet plan based on goal and repo scan |
+
+All files are written only if they do not already exist — user edits survive a
+rerun. Safe to run more than once.
+
+### Detected signals
+
+- Python: `pyproject.toml`, `requirements.txt`, `setup.py`
+- Node / Vite: `package.json`, `vite.config.*`
+- Git, README, `scripts/`, `tests/` directories
+- `package.json` scripts block (install, test, dev/start)
+- Python project name and `[project.scripts]` console entry points from `pyproject.toml`
+
+---
+
 ## Darwin Eval Harness V0
 
 No Darwin module becomes permanent unless it beats baseline.
@@ -218,6 +252,7 @@ evals/
 ```bash
 source .venv/bin/activate
 bash scripts/smoke_test_chunk_os.sh        # full CLI loop
+bash scripts/smoke_test_repo_intake.sh     # repo intake
 bash scripts/smoke_test_eval_harness.sh    # eval harness
 python scripts/smoke_test_mcp_tools.py     # MCP tool functions
 ```
