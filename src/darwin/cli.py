@@ -1,4 +1,5 @@
 import re
+from datetime import datetime
 from pathlib import Path
 
 import typer
@@ -270,6 +271,122 @@ def prepare_chunk(
     for path, content in files:
         status = _write_if_missing(path, content)
         typer.echo(f"{status + ':':<9} {path}")
+
+
+VALID_STATUSES = {"pass", "fail", "blocked"}
+
+REQUIRED_FILES = [
+    "TASK.md",
+    "STEP.md",
+    "CONTEXT.md",
+    "CLAUDE_PROMPT.md",
+    "CODEX_REVIEW_PROMPT.md",
+    "ACCEPTANCE.md",
+    "TESTS.md",
+]
+OPTIONAL_FILES = ["RESULT.md"]
+FORBIDDEN_FILES = ["MEMORY_UPDATE.md", "metadata.yaml"]
+
+
+def _check_chunk(chunk_path: Path) -> None:
+    """Raise a clean error if chunk folder or TASK.md is missing."""
+    if not chunk_path.exists():
+        typer.echo(f"error: chunk folder not found: {chunk_path}", err=True)
+        raise typer.Exit(1)
+    if not (chunk_path / "TASK.md").exists():
+        typer.echo(f"error: TASK.md not found in {chunk_path}", err=True)
+        raise typer.Exit(1)
+
+
+def _now() -> str:
+    return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+
+@app.command("record-result")
+def record_result(
+    chunk_path: Path = typer.Argument(..., help="Path to the chunk folder."),
+    status: str = typer.Option(..., help="Result status: pass, fail, or blocked."),
+    notes: str = typer.Option("", help="Notes about the result."),
+) -> None:
+    """Record a result entry (pass/fail/blocked) for a chunk."""
+    _check_chunk(chunk_path)
+
+    if status not in VALID_STATUSES:
+        typer.echo(
+            f"error: invalid status '{status}'. Choose from: {', '.join(sorted(VALID_STATUSES))}",
+            err=True,
+        )
+        raise typer.Exit(1)
+
+    task_text = _parse_task_text((chunk_path / "TASK.md").read_text())
+    result_file = chunk_path / "RESULT.md"
+    timestamp = _now()
+
+    entry = (
+        f"\n## Result — {timestamp}\n\n"
+        f"**Chunk:** {chunk_path}\n"
+        f"**Task:** {task_text}\n"
+        f"**Status:** {status.upper()}\n"
+        f"**Notes:** {notes or '(none)'}\n"
+    )
+
+    if result_file.exists():
+        result_file.write_text(result_file.read_text() + entry)
+        typer.echo(f"appended: {result_file}")
+    else:
+        result_file.write_text(f"# Results — {chunk_path.name}\n" + entry)
+        typer.echo(f"created:  {result_file}")
+
+
+@app.command("review-chunk")
+def review_chunk(
+    chunk_path: Path = typer.Argument(..., help="Path to the chunk folder."),
+) -> None:
+    """Run local file checks on a chunk and write REVIEW.md."""
+    _check_chunk(chunk_path)
+
+    timestamp = _now()
+    lines: list[str] = []
+
+    lines.append(f"## Review — {timestamp}\n")
+    lines.append("### Required Files\n")
+    all_required_present = True
+    for name in REQUIRED_FILES:
+        present = (chunk_path / name).exists()
+        mark = "x" if present else " "
+        lines.append(f"- [{mark}] {name}")
+        if not present:
+            all_required_present = False
+
+    lines.append("\n### Optional Files\n")
+    for name in OPTIONAL_FILES:
+        present = (chunk_path / name).exists()
+        mark = "x" if present else " "
+        lines.append(f"- [{mark}] {name}")
+
+    lines.append("\n### Forbidden Files\n")
+    any_forbidden_present = False
+    for name in FORBIDDEN_FILES:
+        present = (chunk_path / name).exists()
+        mark = "x" if present else " "
+        lines.append(f"- [{mark}] {name} {'← PRESENT (forbidden)' if present else ''}")
+        if present:
+            any_forbidden_present = True
+
+    verdict = "PASS" if (all_required_present and not any_forbidden_present) else "FAIL"
+    lines.append(f"\n### Verdict: {verdict}\n")
+
+    entry = "\n".join(lines) + "\n"
+    review_file = chunk_path / "REVIEW.md"
+
+    if review_file.exists():
+        review_file.write_text(review_file.read_text() + "\n---\n\n" + entry)
+        typer.echo(f"appended: {review_file}")
+    else:
+        review_file.write_text(f"# Review — {chunk_path.name}\n\n" + entry)
+        typer.echo(f"created:  {review_file}")
+
+    typer.echo(f"verdict:  {verdict}")
 
 
 if __name__ == "__main__":

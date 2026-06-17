@@ -1,6 +1,6 @@
 # darwin
 
-Darwin CLI workspace skeleton (Chunk 006).
+Darwin CLI workspace skeleton (Chunk 007).
 
 ## Install
 
@@ -93,3 +93,32 @@ All files are **never overwritten** — user edits survive re-runs.
 
 - Chunk folder does not exist
 - `TASK.md` is missing from the folder
+
+### `darwin record-result <chunk_path> --status <status> --notes <notes>`
+
+Records a timestamped result entry for a chunk. Appends to `RESULT.md` if it
+already exists — never erases previous entries.
+
+```bash
+darwin record-result chunks/001-create-project-skeleton --status pass --notes "all tests passed"
+darwin record-result chunks/001-create-project-skeleton --status fail --notes "missing output file"
+```
+
+**Allowed statuses:** `pass`, `fail`, `blocked`
+
+### `darwin review-chunk <chunk_path>`
+
+Runs local file checks on a chunk and writes a timestamped checklist to
+`REVIEW.md`. Appends on repeated runs — never erases previous reviews.
+
+```bash
+darwin review-chunk chunks/001-create-project-skeleton
+```
+
+**Checks performed:**
+
+- Required files present: `TASK.md`, `STEP.md`, `CONTEXT.md`, `CLAUDE_PROMPT.md`, `CODEX_REVIEW_PROMPT.md`, `ACCEPTANCE.md`, `TESTS.md`
+- Optional: `RESULT.md`
+- Forbidden (must not exist): `MEMORY_UPDATE.md`, `metadata.yaml`
+
+**Verdict:** `PASS` if all required files exist and no forbidden files are present; `FAIL` otherwise.
