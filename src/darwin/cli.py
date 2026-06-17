@@ -11,12 +11,15 @@ from darwin.core import (
     VALID_STATUSES,
     _chunk_templates,
     now,
+    op_doctor,
     op_eval_init,
     op_eval_list,
     op_eval_report,
     op_eval_run,
     op_inspect_repo,
+    op_status,
     op_update_memory,
+    op_version,
     parse_task_text,
     slug,
     write_if_missing,
@@ -299,6 +302,53 @@ def eval_report() -> None:
         typer.echo(f"error: {result['error']}", err=True)
         raise typer.Exit(1)
     typer.echo(result["content"])
+
+
+@app.command("version")
+def version_cmd() -> None:
+    """Print Darwin version."""
+    result = op_version()
+    typer.echo(f"darwin version {result['version']}")
+
+
+@app.command("status")
+def status() -> None:
+    """Show workspace and Darwin level summary."""
+    r = op_status(Path("."))
+    typer.echo("Darwin Status")
+    typer.echo("=" * 13)
+    typer.echo(f"CWD: {r['cwd']}")
+    typer.echo(f"git: {'yes (.git found)' if r['has_git'] else 'not found'}")
+    typer.echo("")
+    typer.echo("Project files:")
+    for name, present in r["files"].items():
+        typer.echo(f"  [{'x' if present else ' '}] {name}")
+    typer.echo("")
+    typer.echo("Workspace directories:")
+    for name, present in r["dirs"].items():
+        typer.echo(f"  [{'x' if present else ' '}] {name}")
+    typer.echo("")
+    typer.echo("Smoke tests:")
+    for name, present in r["smoke_tests"].items():
+        typer.echo(f"  [{'x' if present else ' '}] {name}")
+    typer.echo("")
+    typer.echo(f"Darwin level: {r['darwin_level']} — {r['darwin_level_label']}")
+
+
+@app.command("doctor")
+def doctor() -> None:
+    """Run read-only health checks. Does not run smoke tests."""
+    checks = op_doctor(Path("."))
+    typer.echo("Darwin Doctor")
+    typer.echo("=" * 13)
+    for c in checks:
+        detail = f" — {c['detail']}" if c["detail"] else ""
+        typer.echo(f"[{c['status']:<4}] {c['check']}{detail}")
+    typer.echo("")
+    n_pass = sum(1 for c in checks if c["status"] == "PASS")
+    n_warn = sum(1 for c in checks if c["status"] == "WARN")
+    n_fail = sum(1 for c in checks if c["status"] == "FAIL")
+    typer.echo(f"Summary: {n_pass} PASS, {n_warn} WARN, {n_fail} FAIL")
 
 
 if __name__ == "__main__":

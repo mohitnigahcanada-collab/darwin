@@ -151,9 +151,79 @@ darwin update-memory chunks/001-build-the-cli-skeleton
 
 ---
 
+## Status / Doctor / Version
+
+Quick commands to verify Darwin is healthy before starting work.
+
+```bash
+darwin version
+darwin status
+darwin doctor
+```
+
+### `darwin version`
+
+Prints the installed Darwin version from package metadata.
+
+```
+darwin version 0.2.0
+```
+
+### `darwin status`
+
+Read-only. Shows the current workspace layout and the installed Darwin feature level. Useful when switching between projects.
+
+```bash
+darwin status
+# Darwin Status
+# =============
+# CWD: /path/to/project
+# git: yes (.git found)
+#
+# Project files:
+#   [x] pyproject.toml
+#   [x] README.md
+#
+# Workspace directories:
+#   [x] chunks/
+#   [x] memory/
+#   [ ] evals/
+#   [ ] .darwin/
+#   [x] scripts/
+#
+# Smoke tests:
+#   [x] scripts/smoke_test_chunk_os.sh
+#   [x] scripts/smoke_test_mcp_tools.py
+#   [x] scripts/smoke_test_eval_harness.sh
+#   [x] scripts/smoke_test_repo_intake.sh
+#   [x] scripts/smoke_test_status_doctor.sh
+#
+# Darwin level: 4 — Existing Repo Intake V0
+```
+
+### `darwin doctor`
+
+Read-only. Checks Python version, package imports, entry point registration, optional MCP SDK, smoke test file presence, and absence of forbidden files. Does **not** run smoke tests. Prints `PASS`, `WARN`, or `FAIL` per check.
+
+```bash
+darwin doctor
+# Darwin Doctor
+# =============
+# [PASS] Python 3.11.x >= 3.9
+# [PASS] darwin package importable
+# [PASS] typer importable
+# [PASS] darwin CLI entry point
+# [WARN] MCP SDK (optional) — not installed — run: pip install darwin[mcp]
+# [WARN] scripts/smoke_test_chunk_os.sh — not found in current directory
+# ...
+# Summary: 9 PASS, 5 WARN, 0 FAIL
+```
+
+`WARN` means non-critical (e.g. MCP not installed, running from a directory that isn't the repo root). `FAIL` means something is broken.
+
 ---
 
-## Repo Intake V0
+## Existing Repo Intake V0
 
 Inspect an existing project and let Darwin build a `.darwin/` understanding pack
 before any coding starts. No LLM calls — deterministic file scanning only.
@@ -254,6 +324,7 @@ source .venv/bin/activate
 bash scripts/smoke_test_chunk_os.sh        # full CLI loop
 bash scripts/smoke_test_repo_intake.sh     # repo intake
 bash scripts/smoke_test_eval_harness.sh    # eval harness
+bash scripts/smoke_test_status_doctor.sh   # version / status / doctor
 python scripts/smoke_test_mcp_tools.py     # MCP tool functions
 ```
 

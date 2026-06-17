@@ -6,6 +6,7 @@ They never print to stdout — callers handle output.
 
 import json
 import re
+import sys
 from datetime import datetime
 from pathlib import Path
 
@@ -980,3 +981,174 @@ def op_inspect_repo(repo: Path, goal: str) -> dict:
         "created": created,
         "existing": existing,
     }
+
+
+# ── status / doctor / version operations ─────────────────────────────────────
+
+def _find_metadata_yaml(base: Path) -> bool:
+    """Return True if any metadata.yaml exists under base, skipping noisy dirs."""
+    _skip = frozenset([".venv", "__pycache__", ".git", "node_modules", "dist", "build"])
+    stack = [base]
+    while stack:
+        current = stack.pop()
+        try:
+            for item in current.iterdir():
+                if item.is_dir() and item.name not in _skip:
+                    stack.append(item)
+                elif item.is_file() and item.name == "metadata.yaml":
+                    return True
+        except PermissionError:
+            continue
+    return False
+
+
+def op_version() -> dict:
+    """Return the installed Darwin version."""
+    v = "unknown"
+    try:
+        from importlib.metadata import version as _imv
+        v = _imv("darwin")
+    except Exception:
+        pass
+    if v == "unknown":
+        try:
+            from darwin import __version__ as _ver
+            v = _ver
+        except Exception:
+            pass
+    return {"version": v}
+
+
+def op_status(base: Path) -> dict:
+    """Return a summary of the current workspace and installed Darwin level."""
+    dirs = {
+        "chunks/": (base / "chunks").exists(),
+        "memory/": (base / "memory").exists(),
+        "evals/": (base / "evals").exists(),
+        ".darwin/": (base / ".darwin").exists(),
+        "scripts/": (base / "scripts").exists(),
+    }
+    files = {
+        "pyproject.toml": (base / "pyproject.toml").exists(),
+        "README.md": (base / "README.md").exists(),
+    }
+    smoke_tests = {
+        "scripts/smoke_test_chunk_os.sh": (base / "scripts" / "smoke_test_chunk_os.sh").exists(),
+        "scripts/smoke_test_mcp_tools.py": (base / "scripts" / "smoke_test_mcp_tools.py").exists(),
+        "scripts/smoke_test_eval_harness.sh": (base / "scripts" / "smoke_test_eval_harness.sh").exists(),
+        "scripts/smoke_test_repo_intake.sh": (base / "scripts" / "smoke_test_repo_intake.sh").exists(),
+        "scripts/smoke_test_status_doctor.sh": (base / "scripts" / "smoke_test_status_doctor.sh").exists(),
+    }
+
+    _core = sys.modules.get("darwin.core")
+    level = 0
+    if _core and hasattr(_core, "op_prepare_chunk"):
+        level = 1
+    try:
+        import darwin.mcp_server  # noqa: F401
+        level = max(level, 2)
+    except ImportError:
+        pass
+    if _core and hasattr(_core, "op_eval_init"):
+        level = max(level, 3)
+    if _core and hasattr(_core, "op_inspect_repo"):
+        level = max(level, 4)
+    _level_labels = {
+        0: "none",
+        1: "Chunk OS V1",
+        2: "Chunk MCP",
+        3: "Eval Harness V0",
+        4: "Existing Repo Intake V0",
+    }
+    level_label = _level_labels.get(level, "unknown")
+
+    return {
+        "cwd": str(base.resolve()),
+        "has_git": (base / ".git").exists(),
+        "dirs": dirs,
+        "files": files,
+        "smoke_tests": smoke_tests,
+        "darwin_level": level,
+        "darwin_level_label": level_label,
+    }
+
+
+def op_doctor(base: Path) -> list:
+    """Run read-only health checks. Returns list of check result dicts."""
+    checks: list = []
+
+    def _chk(name: str, status: str, detail: str = "") -> None:
+        checks.append({"check": name, "status": status, "detail": detail})
+
+    # Python version
+    vi = sys.version_info
+    py_str = f"{vi.major}.{vi.minor}.{vi.micro}"
+    if vi >= (3, 9):
+        _chk(f"Python {py_str}", "PASS", ">= 3.9")
+    else:
+        _chk(f"Python {py_str}", "FAIL", "3.9+ required")
+
+    # darwin package
+    try:
+        import darwin as _d  # noqa: F401
+        _chk("darwin package importable", "PASS")
+    except ImportError as exc:
+        _chk("darwin package importable", "FAIL", str(exc))
+
+    # typer
+    try:
+        import typer as _t  # noqa: F401
+        _chk("typer importable", "PASS")
+    except ImportError as exc:
+        _chk("typer importable", "FAIL", str(exc))
+
+    # CLI entry point
+    try:
+        from importlib.metadata import entry_points as _eps
+        names = [ep.name for ep in _eps(group="console_scripts")]
+        if "darwin" in names:
+            _chk("darwin CLI entry point", "PASS")
+        else:
+            _chk("darwin CLI entry point", "WARN", "not in metadata — run: pip install -e .")
+    except Exception as exc:
+        _chk("darwin CLI entry point", "WARN", str(exc))
+
+    # MCP (optional)
+    try:
+        from mcp.server.fastmcp import FastMCP as _F  # noqa: F401
+        _chk("MCP SDK (optional)", "PASS", "mcp[cli] installed")
+    except ImportError:
+        _chk("MCP SDK (optional)", "WARN", "not installed — run: pip install darwin[mcp]")
+
+    # Smoke test scripts
+    for script in [
+        "scripts/smoke_test_chunk_os.sh",
+        "scripts/smoke_test_mcp_tools.py",
+        "scripts/smoke_test_eval_harness.sh",
+        "scripts/smoke_test_repo_intake.sh",
+        "scripts/smoke_test_status_doctor.sh",
+    ]:
+        if (base / script).exists():
+            _chk(script, "PASS", "found")
+        else:
+            _chk(script, "WARN", "not found in current directory")
+
+    # Core ops present
+    _core = sys.modules.get("darwin.core")
+    for op_name, label in [
+        ("op_prepare_chunk", "Chunk OS"),
+        ("op_eval_init", "Eval Harness"),
+        ("op_inspect_repo", "Repo Intake"),
+    ]:
+        if _core and hasattr(_core, op_name):
+            _chk(f"{op_name} ({label})", "PASS")
+        else:
+            _chk(f"{op_name} ({label})", "FAIL", f"not found in darwin.core")
+
+    # No metadata.yaml
+    if _find_metadata_yaml(base):
+        _chk("No metadata.yaml", "FAIL", "metadata.yaml found — remove it")
+    else:
+        _chk("No metadata.yaml", "PASS")
+
+    return checks
