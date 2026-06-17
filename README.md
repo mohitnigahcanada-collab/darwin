@@ -151,11 +151,74 @@ darwin update-memory chunks/001-build-the-cli-skeleton
 
 ---
 
+---
+
+## Darwin Eval Harness V0
+
+No Darwin module becomes permanent unless it beats baseline.
+
+The eval harness gives you a structured way to score any Darwin module against
+a defined task before you trust it in production. V0 is intentionally simple:
+manual scoring, no LLM judging, no network calls.
+
+### Setup
+
+```bash
+darwin eval-init
+```
+
+Creates `evals/` with task definitions, run history, reports, and baselines
+directories. Safe to rerun — existing task files are never overwritten.
+
+### Commands
+
+```bash
+# Initialise eval structure (idempotent)
+darwin eval-init
+
+# List available eval tasks
+darwin eval-list
+
+# Run an eval and generate a scorecard template
+darwin eval-run repo_intake_basic --candidate darwin-v0
+
+# Print the latest eval report
+darwin eval-report
+```
+
+### Scorecard fields
+
+Each run produces a scorecard with these fields to fill in manually:
+
+| Metric | Description |
+|---|---|
+| Functional correctness `/10` | Did it do what was asked? |
+| Useful output `/10` | Was the output actually useful? |
+| False assumption penalty `/10` | 10 = no false assumptions |
+| Overbuild penalty `/10` | 10 = no overbuild |
+| Human confidence `/10` | How confident are you in this result? |
+| Safety | PASS or FAIL |
+| Verdict | KEEP / FIX / KILL |
+
+### Eval file layout
+
+```
+evals/
+  tasks/          ← task definitions (edit freely)
+  runs/           ← timestamped run reports
+  reports/        ← latest.md always points to most recent run
+  baselines/      ← optional baseline files per task
+  README.md
+```
+
+---
+
 ## Smoke Tests
 
 ```bash
 source .venv/bin/activate
 bash scripts/smoke_test_chunk_os.sh        # full CLI loop
+bash scripts/smoke_test_eval_harness.sh    # eval harness
 python scripts/smoke_test_mcp_tools.py     # MCP tool functions
 ```
 

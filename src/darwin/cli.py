@@ -11,6 +11,10 @@ from darwin.core import (
     VALID_STATUSES,
     _chunk_templates,
     now,
+    op_eval_init,
+    op_eval_list,
+    op_eval_report,
+    op_eval_run,
     op_update_memory,
     parse_task_text,
     slug,
@@ -223,6 +227,59 @@ def next_chunk() -> None:
             typer.echo(f"run:         darwin prepare-chunk {chunk_path}")
         return
     typer.echo("No pending chunks. All tasks are done or ROADMAP.md has no unchecked items.")
+
+
+@app.command("eval-init")
+def eval_init() -> None:
+    """Create eval folder structure and starter task files."""
+    result = op_eval_init(Path("."))
+    for d in result["dirs"]:
+        typer.echo(f"ready:   {d}/")
+    for f in result["created"]:
+        typer.echo(f"created: {f}")
+    for f in result["existing"]:
+        typer.echo(f"exists:  {f}")
+
+
+@app.command("eval-list")
+def eval_list() -> None:
+    """List available eval task files in evals/tasks/."""
+    result = op_eval_list(Path("."))
+    if "error" in result:
+        typer.echo(f"error: {result['error']}", err=True)
+        raise typer.Exit(1)
+    if not result["tasks"]:
+        typer.echo("No eval tasks found in evals/tasks/.")
+        return
+    typer.echo(f"Eval tasks ({result['count']}):")
+    for task in result["tasks"]:
+        typer.echo(f"  {task}")
+
+
+@app.command("eval-run")
+def eval_run(
+    task_name: str = typer.Argument(..., help="Eval task name (without .md)."),
+    candidate: str = typer.Option(..., help="Candidate name being evaluated."),
+) -> None:
+    """Create a timestamped run report for an eval task."""
+    result = op_eval_run(Path("."), task_name, candidate)
+    if "error" in result:
+        typer.echo(f"error: {result['error']}", err=True)
+        raise typer.Exit(1)
+    typer.echo(f"task:      {result['task']}")
+    typer.echo(f"candidate: {result['candidate']}")
+    typer.echo(f"run:       {result['run_file']}")
+    typer.echo(f"latest:    {result['latest_file']}")
+
+
+@app.command("eval-report")
+def eval_report() -> None:
+    """Print evals/reports/latest.md."""
+    result = op_eval_report(Path("."))
+    if "error" in result:
+        typer.echo(f"error: {result['error']}", err=True)
+        raise typer.Exit(1)
+    typer.echo(result["content"])
 
 
 if __name__ == "__main__":
