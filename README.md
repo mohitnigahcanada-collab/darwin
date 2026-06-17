@@ -386,6 +386,72 @@ evals/
 
 ---
 
+## Fast Track Build Protocol
+
+Fast Track is for bundling several low-risk infrastructure improvements only
+when they are local, deterministic, smoke-testable, and easy to split apart.
+It is not permission to add future product modules or execute agents.
+
+Use Fast Track for registry files, docs, status/doctor coverage, and smoke
+tests. Stop immediately if a smoke test fails, user edits are overwritten, app
+code starts executing tools or network calls, or Darwin level changes beyond
+Level 4.
+
+---
+
+## Feature Registry V0
+
+A local deterministic registry of Darwin feature and command coverage.
+
+```bash
+darwin feature-init
+darwin feature-list
+darwin feature-status
+```
+
+`feature-init` creates `.darwin/features/FEATURES.md`,
+`.darwin/features/COMMANDS.md`, and `.darwin/features/COVERAGE.md` only when
+missing. Existing files are never overwritten, so user edits survive reruns.
+`feature-list` and `feature-status` are read-only.
+
+---
+
+## Worker Registry V0
+
+A conservative local catalog of workers Darwin may suggest. It does not
+install, configure, or run Claude, Codex, OpenCode, MCPs, or any agent.
+
+```bash
+darwin worker-init
+darwin worker-list
+darwin worker-suggest --goal "review tests and verify scope"
+```
+
+`worker-init` creates `.darwin/workers/` with worker cards only when missing.
+`worker-list` and `worker-suggest` are read-only and deterministic.
+
+---
+
+## Batch Planner / Speed Lane V0
+
+Plans a batch size for local work. It is planning-only: it does not execute
+agents, tools, MCPs, shell commands, network calls, or LLM calls.
+
+```bash
+darwin batch-plan --goal "safe local registry docs" --max-items 7
+```
+
+Suggested modes:
+
+| Mode | Use when |
+|---|---|
+| `single` | Dangerous, external, production, database, secrets, OpenCode/MCP execution, or agent-protocol execution risk |
+| `small-batch-3` | Mixed refactor, architecture, docs, and tests |
+| `speed-batch-5` | Local deterministic infrastructure, read-only registries, docs, and smoke tests |
+| `max-batch-7` | Explicitly low-risk, local, deterministic, smoke-testable work |
+
+---
+
 ## Smoke Tests
 
 ```bash
@@ -396,6 +462,7 @@ bash scripts/smoke_test_eval_harness.sh    # eval harness
 bash scripts/smoke_test_status_doctor.sh   # version / status / doctor
 bash scripts/smoke_test_spec_surface.sh    # spec-init / spec-status
 bash scripts/smoke_test_tool_registry.sh   # tool-init / tool-list / tool-suggest
+bash scripts/smoke_test_fast_track_bundle.sh # feature / worker / batch planner
 python scripts/smoke_test_mcp_tools.py     # MCP tool functions
 ```
 

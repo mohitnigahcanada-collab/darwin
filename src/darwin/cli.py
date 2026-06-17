@@ -11,11 +11,15 @@ from darwin.core import (
     VALID_STATUSES,
     _chunk_templates,
     now,
+    op_batch_plan,
     op_doctor,
     op_eval_init,
     op_eval_list,
     op_eval_report,
     op_eval_run,
+    op_feature_init,
+    op_feature_list,
+    op_feature_status,
     op_inspect_repo,
     op_spec_init,
     op_spec_status,
@@ -25,6 +29,9 @@ from darwin.core import (
     op_tool_suggest,
     op_update_memory,
     op_version,
+    op_worker_init,
+    op_worker_list,
+    op_worker_suggest,
     parse_task_text,
     slug,
     write_if_missing,
@@ -440,6 +447,129 @@ def doctor() -> None:
     n_warn = sum(1 for c in checks if c["status"] == "WARN")
     n_fail = sum(1 for c in checks if c["status"] == "FAIL")
     typer.echo(f"Summary: {n_pass} PASS, {n_warn} WARN, {n_fail} FAIL")
+
+
+@app.command("feature-init")
+def feature_init() -> None:
+    """Create .darwin/features/ with feature/command/coverage registry files."""
+    result = op_feature_init(Path("."))
+    typer.echo(f"features dir: {result['features_dir']}/")
+    for f in result["created"]:
+        typer.echo(f"created: .darwin/features/{f}")
+    for f in result["existing"]:
+        typer.echo(f"exists:  .darwin/features/{f}")
+
+
+@app.command("feature-list")
+def feature_list() -> None:
+    """List feature registry files in .darwin/features/."""
+    result = op_feature_list(Path("."))
+    if not result["initialized"]:
+        typer.echo(result["message"])
+        raise typer.Exit(1)
+    typer.echo("Feature Registry")
+    typer.echo("=" * 16)
+    typer.echo(f"Features dir: {result['features_dir']}/")
+    typer.echo(f"Files: {', '.join(result['files'])}")
+    typer.echo(f"Complete features: {result['feature_count']}")
+
+
+@app.command("feature-status")
+def feature_status() -> None:
+    """Show feature registry status (.darwin/features/)."""
+    result = op_feature_status(Path("."))
+    if not result["initialized"]:
+        typer.echo(result["message"])
+        raise typer.Exit(1)
+    typer.echo("Feature Registry Status")
+    typer.echo("=" * 23)
+    typer.echo(f"features dir: {result['features_dir']}/")
+    typer.echo("")
+    typer.echo("Files:")
+    for fname, present in result["files"].items():
+        typer.echo(f"  [{'x' if present else ' '}] .darwin/features/{fname}")
+    typer.echo("")
+    typer.echo(f"Known commands: {result['command_count']}")
+    typer.echo(f"Smoke test coverage entries: {result['smoke_test_count']}")
+
+
+@app.command("worker-init")
+def worker_init() -> None:
+    """Create .darwin/workers/ with worker cards. Never overwrites existing cards."""
+    result = op_worker_init(Path("."))
+    typer.echo(f"workers dir: {result['workers_dir']}/")
+    for f in result["created"]:
+        typer.echo(f"created: .darwin/workers/{f}")
+    for f in result["existing"]:
+        typer.echo(f"exists:  .darwin/workers/{f}")
+
+
+@app.command("worker-list")
+def worker_list() -> None:
+    """List worker cards in .darwin/workers/ with role, risk, and approval."""
+    result = op_worker_list(Path("."))
+    if not result["initialized"]:
+        typer.echo(result["message"])
+        raise typer.Exit(1)
+    typer.echo("Worker Registry")
+    typer.echo("=" * 15)
+    typer.echo(f"Workers in {result['workers_dir']}/ ({result['count']}):")
+    typer.echo("")
+    for w in result["workers"]:
+        typer.echo(f"  {w['filename']}")
+        typer.echo(f"    Role:     {w['role']}")
+        typer.echo(f"    Risk:     {w['risk']}")
+        typer.echo(f"    Approval: {w['approval']}")
+
+
+@app.command("worker-suggest")
+def worker_suggest(
+    goal: str = typer.Option(..., help="Your goal or task description."),
+) -> None:
+    """Suggest workers for a goal using deterministic keyword matching."""
+    result = op_worker_suggest(Path("."), goal)
+    typer.echo("Worker Suggestions")
+    typer.echo("=" * 18)
+    typer.echo(f"Goal: {result['goal']}")
+    typer.echo("")
+    if not result["matches"]:
+        typer.echo("No workers matched this goal.")
+    else:
+        typer.echo(f"Recommended workers ({result['total_matched']}):")
+        typer.echo("")
+        for m in result["matches"]:
+            kw_str = ", ".join(m["matched_keywords"])
+            typer.echo(f"  {m['worker']}")
+            typer.echo(f"    Matched:  {kw_str}")
+            typer.echo(f"    Risk:     {m['risk']}")
+            typer.echo(f"    Approval: {m['approval']}")
+        typer.echo("")
+    typer.echo(result["disclaimer"])
+
+
+@app.command("batch-plan")
+def batch_plan(
+    goal: str = typer.Option(..., help="Your goal for batch planning."),
+    max_items: int = typer.Option(7, help="Maximum items in the batch (1-7)."),
+) -> None:
+    """Plan a safe batch size for a goal. Read-only, deterministic, no execution."""
+    result = op_batch_plan(goal, max_items)
+    typer.echo("Batch Planner / Speed Lane")
+    typer.echo("=" * 26)
+    typer.echo(f"Goal:             {result['goal']}")
+    typer.echo(f"Max items:        {result['max_items']}")
+    typer.echo(f"Risk:             {result['risk_classification']}")
+    typer.echo(f"Recommended size: {result['recommended_batch_size']}")
+    typer.echo(f"Suggested mode:   {result['suggested_mode']}")
+    typer.echo(f"Why:              {result['why']}")
+    typer.echo("")
+    typer.echo("Stop conditions:")
+    for c in result["stop_conditions"]:
+        typer.echo(f"  - {c}")
+    typer.echo("")
+    typer.echo(f"Fallback plan:    {result['fallback_plan']}")
+    typer.echo("")
+    typer.echo(f"Note: {result['disclaimer']}")
 
 
 if __name__ == "__main__":

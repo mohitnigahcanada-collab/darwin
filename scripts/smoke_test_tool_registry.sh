@@ -102,6 +102,12 @@ DB_OUT=$($DARWIN tool-suggest --goal "inspect the database schema and run migrat
 echo "$DB_OUT" | grep -qE "supabase_mcp|postgres_mcp" || fail "suggest missing db tool for database goal"
 pass "tool-suggest recommends DB tools for database goal"
 
+# tool-suggest for OpenCode / MCP-heavy phrasing
+section "darwin tool-suggest: OpenCode / MCP-heavy goal"
+OPENCODE_OUT=$($DARWIN tool-suggest --goal "MCP-heavy multi-tool coding task")
+echo "$OPENCODE_OUT" | grep -q "opencode_worker" || fail "suggest missing opencode_worker for MCP-heavy goal"
+pass "tool-suggest recommends OpenCode worker for MCP-heavy goal"
+
 # no metadata.yaml
 section "no metadata.yaml"
 [ -f metadata.yaml ] && fail "metadata.yaml must not exist"
