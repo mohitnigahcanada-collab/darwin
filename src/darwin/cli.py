@@ -389,5 +389,143 @@ def review_chunk(
     typer.echo(f"verdict:  {verdict}")
 
 
+def _parse_latest_result_status(result_md: str) -> str | None:
+    """Return the latest status from RESULT.md (lower-case)."""
+    status = None
+    for line in result_md.splitlines():
+        if line.startswith("**Status:**"):
+            status = line.removeprefix("**Status:**").strip().lower()
+    return status
+
+
+def _parse_latest_review_verdict(review_md: str) -> str | None:
+    """Return the latest verdict from REVIEW.md."""
+    verdict = None
+    for line in review_md.splitlines():
+        if line.startswith("### Verdict:"):
+            verdict = line.removeprefix("### Verdict:").strip()
+    return verdict
+
+
+def _ensure_memory_file(path: Path, heading: str) -> None:
+    if not path.exists():
+        Path("memory").mkdir(exist_ok=True)
+        path.write_text(f"{heading}\n")
+
+
+def _append_memory(path: Path, heading: str, entry: str) -> None:
+    _ensure_memory_file(path, heading)
+    path.write_text(path.read_text() + entry)
+
+
+def _mark_roadmap_done(chunk_path: Path) -> bool:
+    """Mark the chunk's ROADMAP.md line from [ ] to [x]. Returns True if found."""
+    roadmap = Path("ROADMAP.md")
+    if not roadmap.exists():
+        return False
+    slug = chunk_path.name + "/"
+    lines = roadmap.read_text().splitlines()
+    changed = False
+    for i, line in enumerate(lines):
+        if "- [ ]" in line and slug in line:
+            lines[i] = line.replace("- [ ]", "- [x]", 1)
+            changed = True
+            break
+    if changed:
+        roadmap.write_text("\n".join(lines) + "\n")
+    return changed
+
+
+@app.command("update-memory")
+def update_memory(
+    chunk_path: Path = typer.Argument(..., help="Path to the chunk folder."),
+) -> None:
+    """Append memory entries from a chunk result and mark ROADMAP.md if passing."""
+    _check_chunk(chunk_path)
+
+    for required in ("RESULT.md", "REVIEW.md"):
+        if not (chunk_path / required).exists():
+            typer.echo(f"error: {required} not found in {chunk_path}", err=True)
+            raise typer.Exit(1)
+
+    task_text = _parse_task_text((chunk_path / "TASK.md").read_text())
+    result_status = _parse_latest_result_status((chunk_path / "RESULT.md").read_text())
+    review_verdict = _parse_latest_review_verdict((chunk_path / "REVIEW.md").read_text())
+    timestamp = _now()
+
+    is_pass = result_status == "pass" and review_verdict == "PASS"
+
+    typer.echo(f"chunk:   {chunk_path}")
+    typer.echo(f"result:  {result_status}  |  review: {review_verdict}")
+
+    if is_pass:
+        entry = (
+            f"\n## {timestamp} — {chunk_path.name}\n\n"
+            f"Task: {task_text}\n"
+            f"Outcome: passed review\n"
+        )
+        _append_memory(Path("memory/winners.md"), "# Winners", entry)
+        typer.echo("appended: memory/winners.md")
+
+        decision_entry = (
+            f"\n## {timestamp} — {chunk_path.name}\n\n"
+            f"Task: {task_text}\n"
+            f"Decision: accepted — passed result and review\n"
+        )
+        _append_memory(Path("memory/decisions.md"), "# Decisions", decision_entry)
+        typer.echo("appended: memory/decisions.md")
+
+        if _mark_roadmap_done(chunk_path):
+            typer.echo("marked:   ROADMAP.md [x]")
+        else:
+            typer.echo("note:     ROADMAP.md line not found — skipped")
+    else:
+        reason = f"result={result_status}, review={review_verdict}"
+        entry = (
+            f"\n## {timestamp} — {chunk_path.name}\n\n"
+            f"Task: {task_text}\n"
+            f"Outcome: {reason}\n"
+        )
+        _append_memory(Path("memory/mistakes.md"), "# Mistakes", entry)
+        typer.echo("appended: memory/mistakes.md")
+
+        decision_entry = (
+            f"\n## {timestamp} — {chunk_path.name}\n\n"
+            f"Task: {task_text}\n"
+            f"Decision: not accepted — {reason}\n"
+        )
+        _append_memory(Path("memory/decisions.md"), "# Decisions", decision_entry)
+        typer.echo("appended: memory/decisions.md")
+        typer.echo("note:     ROADMAP.md not marked (chunk did not pass)")
+
+
+@app.command("next-chunk")
+def next_chunk() -> None:
+    """Print the first unchecked chunk from ROADMAP.md."""
+    roadmap = Path("ROADMAP.md")
+    if not roadmap.exists():
+        typer.echo("error: ROADMAP.md not found. Run `darwin split-plan` first.", err=True)
+        raise typer.Exit(1)
+
+    for line in roadmap.read_text().splitlines():
+        if not line.startswith("- [ ]"):
+            continue
+        # extract backtick path: `chunks/001-foo/`
+        match = re.search(r"`(chunks/[^`]+)`", line)
+        chunk_path = match.group(1).rstrip("/") if match else None
+
+        # extract summary: text between first — and last —
+        parts = line.lstrip("- [ ]").strip().split(" — ")
+        summary = " — ".join(parts[:-1]) if len(parts) > 1 else parts[0]
+
+        typer.echo(f"next chunk:  {summary.strip()}")
+        if chunk_path:
+            typer.echo(f"path:        {chunk_path}")
+            typer.echo(f"run:         darwin prepare-chunk {chunk_path}")
+        return
+
+    typer.echo("No pending chunks. All tasks are done or ROADMAP.md has no unchecked items.")
+
+
 if __name__ == "__main__":
     app()

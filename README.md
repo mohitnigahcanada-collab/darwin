@@ -1,6 +1,8 @@
 # darwin
 
-Darwin CLI workspace skeleton (Chunk 007).
+Darwin CLI — Chunk OS V1. Breaks a master plan into numbered chunks, prepares
+working files for each chunk, records results, and tracks memory across the
+full loop.
 
 ## Install
 
@@ -13,6 +15,45 @@ source .venv/bin/activate
 python -m pip install -e .
 ```
 
+## Full V1 Workflow
+
+```bash
+# 1. Set up workspace
+darwin init
+
+# 2. Write your plan (edit MASTER_PLAN.md with bullet tasks)
+#    - Build the CLI skeleton
+#    - Add the split-plan command
+#    - ...
+
+# 3. Split plan into chunks
+darwin split-plan MASTER_PLAN.md
+
+# 4. Find the next chunk to work on
+darwin next-chunk
+
+# 5. Prepare working files for that chunk
+darwin prepare-chunk chunks/001-build-the-cli-skeleton
+
+# 6. Do the work
+#    - Read CLAUDE_PROMPT.md and paste it into Claude Code
+#    - Read CODEX_REVIEW_PROMPT.md and paste it into your reviewer
+
+# 7. Record the outcome
+darwin record-result chunks/001-build-the-cli-skeleton --status pass --notes "all tests passed"
+
+# 8. Run a local file review
+darwin review-chunk chunks/001-build-the-cli-skeleton
+
+# 9. Update memory and mark the chunk done in ROADMAP
+darwin update-memory chunks/001-build-the-cli-skeleton
+
+# 10. Move to the next chunk
+darwin next-chunk
+```
+
+---
+
 ## Commands
 
 ### `darwin init`
@@ -20,105 +61,101 @@ python -m pip install -e .
 Sets up the workspace in the current directory. Safe to run more than once —
 never overwrites existing files.
 
-**Folders created:**
+**Folders created:** `chunks/` `memory/` `templates/` `reports/`
 
-- `chunks/`
-- `memory/`
-- `templates/`
-- `reports/`
+**Starter files created (only if missing):**
+`MASTER_PLAN.md`, `ROADMAP.md`, `memory/mistakes.md`, `memory/winners.md`,
+`memory/decisions.md`
 
-**Starter files created (only if they do not already exist):**
-
-- `MASTER_PLAN.md` — short example plan
-- `ROADMAP.md` — placeholder
-- `memory/mistakes.md`
-- `memory/winners.md`
-- `memory/decisions.md`
+---
 
 ### `darwin split-plan MASTER_PLAN.md`
 
-Reads the given markdown file, extracts all bullet tasks (lines starting with
-`- ` or `* `), creates a numbered chunk folder for each task under `chunks/`,
-writes `TASK.md` in each folder, and regenerates `ROADMAP.md`.
+Reads bullet tasks (`- ` or `* `) from the plan, creates `chunks/NNN-slug/`
+folders with `TASK.md`, and regenerates `ROADMAP.md`. Existing `TASK.md` files
+are never overwritten.
 
 ```bash
 darwin split-plan MASTER_PLAN.md
 ```
 
-**What it creates:**
+---
 
-- `chunks/001-task-slug/TASK.md`
-- `chunks/002-task-slug/TASK.md`
-- …
-- `ROADMAP.md` (always regenerated from the current plan)
+### `darwin next-chunk`
 
-**Idempotent:** running it twice does not crash. Existing `TASK.md` files are
-never overwritten. `MASTER_PLAN.md` is never modified.
+Reads `ROADMAP.md` and prints the first unchecked `- [ ]` chunk.
 
-Example `ROADMAP.md` output:
-
-```markdown
-# Roadmap
-
-## Pending Tasks
-
-- [ ] 001 — Create project skeleton — `chunks/001-create-project-skeleton/`
-- [ ] 002 — Add CLI init command — `chunks/002-add-cli-init-command/`
+```bash
+darwin next-chunk
+# next chunk:  001 — Build the CLI skeleton
+# path:        chunks/001-build-the-cli-skeleton
+# run:         darwin prepare-chunk chunks/001-build-the-cli-skeleton
 ```
+
+---
 
 ### `darwin prepare-chunk <chunk_path>`
 
-Reads `TASK.md` from an existing chunk folder and creates `STEP.md` and
-`CONTEXT.md` inside it. Safe to run more than once — existing files are never
-overwritten.
-
-```bash
-darwin prepare-chunk chunks/001-create-project-skeleton
-```
-
-**What it creates inside the chunk folder (only if missing):**
+Creates all working files inside a chunk folder (only if missing):
 
 | File | Purpose |
 |---|---|
-| `STEP.md` | Goal, scope, inputs, outputs, acceptance criteria, notes |
+| `STEP.md` | Goal, scope, inputs, outputs, acceptance criteria |
 | `CONTEXT.md` | Task summary, project state, files involved, constraints |
-| `CLAUDE_PROMPT.md` | Ready-to-paste prompt for Claude to implement the chunk |
+| `CLAUDE_PROMPT.md` | Ready-to-paste prompt for Claude |
 | `CODEX_REVIEW_PROMPT.md` | Strict reviewer prompt — outputs PASS or FAIL |
-| `ACCEPTANCE.md` | Human checklist to sign off the chunk |
+| `ACCEPTANCE.md` | Human sign-off checklist |
 | `TESTS.md` | Test commands: install, run, idempotency, error cases |
 
-All files are **never overwritten** — user edits survive re-runs.
-
-**Error cases handled cleanly:**
-
-- Chunk folder does not exist
-- `TASK.md` is missing from the folder
+---
 
 ### `darwin record-result <chunk_path> --status <status> --notes <notes>`
 
-Records a timestamped result entry for a chunk. Appends to `RESULT.md` if it
-already exists — never erases previous entries.
+Appends a timestamped result entry to `RESULT.md`. Never overwrites.
 
 ```bash
-darwin record-result chunks/001-create-project-skeleton --status pass --notes "all tests passed"
-darwin record-result chunks/001-create-project-skeleton --status fail --notes "missing output file"
+darwin record-result chunks/001-build-the-cli-skeleton --status pass --notes "tests green"
+darwin record-result chunks/001-build-the-cli-skeleton --status fail --notes "missing output"
+darwin record-result chunks/001-build-the-cli-skeleton --status blocked --notes "waiting on upstream"
 ```
 
-**Allowed statuses:** `pass`, `fail`, `blocked`
+---
 
 ### `darwin review-chunk <chunk_path>`
 
-Runs local file checks on a chunk and writes a timestamped checklist to
-`REVIEW.md`. Appends on repeated runs — never erases previous reviews.
+Checks required files, optional files, and forbidden files; writes a
+timestamped verdict to `REVIEW.md`. Appends on repeated runs.
+
+**Required:** `TASK.md` `STEP.md` `CONTEXT.md` `CLAUDE_PROMPT.md`
+`CODEX_REVIEW_PROMPT.md` `ACCEPTANCE.md` `TESTS.md`
+
+**Forbidden:** `MEMORY_UPDATE.md` `metadata.yaml`
+
+Verdict is `PASS` only when all required files are present and no forbidden
+files exist.
+
+---
+
+### `darwin update-memory <chunk_path>`
+
+Reads the latest status from `RESULT.md` and verdict from `REVIEW.md`, then:
+
+| Outcome | Actions |
+|---|---|
+| result=pass AND review=PASS | appends to `memory/winners.md` + `memory/decisions.md`; marks ROADMAP `[x]` |
+| result=fail/blocked OR review=FAIL | appends to `memory/mistakes.md` + `memory/decisions.md`; ROADMAP unchanged |
 
 ```bash
-darwin review-chunk chunks/001-create-project-skeleton
+darwin update-memory chunks/001-build-the-cli-skeleton
 ```
 
-**Checks performed:**
+---
 
-- Required files present: `TASK.md`, `STEP.md`, `CONTEXT.md`, `CLAUDE_PROMPT.md`, `CODEX_REVIEW_PROMPT.md`, `ACCEPTANCE.md`, `TESTS.md`
-- Optional: `RESULT.md`
-- Forbidden (must not exist): `MEMORY_UPDATE.md`, `metadata.yaml`
+## Smoke Test
 
-**Verdict:** `PASS` if all required files exist and no forbidden files are present; `FAIL` otherwise.
+```bash
+source .venv/bin/activate
+bash scripts/smoke_test_chunk_os.sh
+```
+
+Runs a full V1 loop in a temp directory and verifies all acceptance criteria.
